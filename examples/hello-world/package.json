@@ -1,0 +1,15 @@
+{
+  "name": "@fns-run/hello-world",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "private": true,
+  "devDependencies": {
+    "@types/express": "^4.17.17",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "@fns-run/sdk": "*",
+    "@fns-run/express": "*"
+  }
+}

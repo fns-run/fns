@@ -1,0 +1,17 @@
+  - per signal limitations and schema
+  - delay
+  - concurrency
+  - custom fetch
+  - batching
+  - priority
+  - rateLimit
+  - debounce
+  - all based on JSON query
+  - start other workflows or signal/query other workflows
+  - mutex
+  - signals
+  - state management / snapshotting
+  - onCancel, onFailure hook
+  - pause/resume
+  - retry
+  - create execution id

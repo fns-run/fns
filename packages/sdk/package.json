@@ -1,0 +1,17 @@
+{
+  "name": "@fns-run/sdk",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "json-schema-typed": "^8.0.1",
+    "ms": "^2.1.3"
+  },
+  "devDependencies": {
+    "@types/ms": "^0.7.31",
+    "typescript": "^5.1.6"
+  }
+}
