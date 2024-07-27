@@ -1,5 +1,5 @@
-import { FNS_SIGNATURE_HEADER, Fns } from "@fns-run/sdk";
-import type { Request, Response } from "express";
+import { FNS_SIGNATURE_HEADER, Fns } from "./index.ts";
+import type { Request, Response } from "npm:express";
 
 export const serve = (client: Fns) => {
   return async (req: Request, res: Response) => {
@@ -11,8 +11,8 @@ export const serve = (client: Fns) => {
       const result = await client.onHandler(event, abortController.signal);
       return res.json(result);
     } catch (err: any) {
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+      return res.status(400).send(`Internal Server Error: ${err.message}`);
     }
   }
 };
-export default { };
+export default { serve };

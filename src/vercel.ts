@@ -1,6 +1,5 @@
-import { FNS_SIGNATURE_HEADER, Fns } from "@fns-run/sdk";
-import type { WorkflowFunction } from "@fns-run/sdk/dist/types";
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { FNS_SIGNATURE_HEADER, Fns } from "./index.ts";
+import type { VercelRequest, VercelResponse } from 'npm:@vercel/node'
 import type { Readable } from 'node:stream';
 
 export const config = {
@@ -21,7 +20,6 @@ export const serve = (client: Fns) => {
     if(req.method === "GET") return res.json(client.getConfig());
     const abortController = new AbortController();
     try {
-      const buf = await readableToString2(req);
       const event = client.constructEvent(req.body.toString('utf8'), req.headers[FNS_SIGNATURE_HEADER] as string);
       const result = await client.onHandler(event, abortController.signal);
       return res.json(result);
@@ -31,3 +29,5 @@ export const serve = (client: Fns) => {
     }
   }
 };
+
+export default { serve };

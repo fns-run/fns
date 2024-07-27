@@ -130,3 +130,6 @@ dist
 .pnp.*
 # .DS_Store files all
 **/.DS_Store
+
+coverage/
+npm/

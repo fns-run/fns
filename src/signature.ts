@@ -1,5 +1,3 @@
-import crypto from 'node:crypto'
-
 const SECONDS30 = 1 * 30 * 1000;
 
 export const sign = async(
@@ -7,9 +5,10 @@ export const sign = async(
   secret: string,
   timestamp: number = Date.now()
 ) => {
-  const signature = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret + input + timestamp));
+  const cryptoLib = crypto ? crypto : await import('node:crypto');
+  const signature = await cryptoLib.subtle.digest('SHA-256', new TextEncoder().encode(secret + input + timestamp));
   const b64signature = btoa(String.fromCharCode(...new Uint8Array(signature)));
-  return `${timestamp},${b64signature}`;
+  return [timestamp, b64signature].join(',');
 }
 export const verify = async(
   input: string,
@@ -17,22 +16,21 @@ export const verify = async(
   signature: string,
   opts: { timeout?: number; timestamp?: number } = {}
 ) => {
+  const cryptoLib = crypto ? crypto : await import('node:crypto');
+  if (!signature) return false;
   const match = signature.split(",", 2);
-  if (match.length !== 2) {
-    return false;
-  }
+  if (match.length !== 2) return false;
 
   const poststamp = Number(match[1]);
+  if (isNaN(poststamp)) return false;
   const postDigest = match[2];
 
   const timestamp = opts?.timestamp ?? Date.now();
   const timeout = opts?.timeout ?? SECONDS30;
 
-  const difference = Math.abs(timestamp - poststamp);
-  if (difference > timeout) {
-    return false;
-  }
-  const computedSignature = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret + input + poststamp));
+  if (timestamp - poststamp > timeout) return false;
+  
+  const computedSignature = await cryptoLib.subtle.digest('SHA-256', new TextEncoder().encode(secret + input + poststamp));
   const b64computedSignature = btoa(String.fromCharCode(...new Uint8Array(computedSignature)));
   return b64computedSignature === postDigest;
 }
