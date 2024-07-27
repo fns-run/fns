@@ -1,6 +1,14 @@
 import { verify } from "./signature.ts";
 import { ms } from "https://raw.githubusercontent.com/denolib/ms/d9e99a2fa10a9dc8d4cd97b8de1be10c57bf6e77/ms.ts";
-import { NonRetriableError, FnsRequestParams, FnsResponse, FnsFunction, Schema, Mutation, StepType } from './types.ts';
+import {
+  FnsFunction,
+  FnsRequestParams,
+  FnsResponse,
+  Mutation,
+  NonRetriableError,
+  Schema,
+  StepType,
+} from "./types.ts";
 import { block, execute } from "./helper.ts";
 import { xxHash32 } from "./xxhash32.ts";
 
@@ -12,7 +20,9 @@ interface Query {
   dependencies: string[];
 }
 type Callback<T = any> = () => T;
-interface StateGetter<T = any> extends Callback<T> { id: string; };
+interface StateGetter<T = any> extends Callback<T> {
+  id: string;
+}
 interface StartExecutionArgs {
   id: string;
   name: string;
@@ -33,7 +43,7 @@ interface StartExecutionResponse {
 }
 interface SignalExecutionResponse {
   ok: boolean;
-  signal: { id: string; }
+  signal: { id: string };
 }
 
 export interface FnsOptions {
@@ -61,7 +71,11 @@ export class Fns {
     this._options = options;
     this._ver = 0;
   }
-  private async POST<T = any>(endpoint: string, body: any, headers: Record<string, string> = {}): Promise<T> {
+  private async POST<T = any>(
+    endpoint: string,
+    body: any,
+    headers: Record<string, string> = {},
+  ): Promise<T> {
     if (!this._options.endpoint) throw new Error("Endpoint is required");
     const url = new URL(endpoint, this._options.endpoint);
     const res = await fetch(url, {
@@ -69,9 +83,9 @@ export class Fns {
       headers: {
         ...headers,
         "Content-Type": "application/json",
-        Authorization: `ApiKey ${this._options.apiKey}`
+        Authorization: `ApiKey ${this._options.apiKey}`,
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`);
     return await res.json() as T;
@@ -81,14 +95,17 @@ export class Fns {
     const url = new URL(endpoint, this._options.endpoint);
     const res = await fetch(url, {
       headers: {
-        Authorization: `ApiKey ${this._options.apiKey}`
-      }
+        Authorization: `ApiKey ${this._options.apiKey}`,
+      },
     });
     if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`);
     return await res.json() as T;
   }
   async invoke(args: StartExecutionArgs) {
-    const res = await this.POST<StartExecutionResponse>("/executions/create", args);
+    const res = await this.POST<StartExecutionResponse>(
+      "/executions/create",
+      args,
+    );
     return res;
   }
   async result<T>(id: string) {
@@ -96,7 +113,13 @@ export class Fns {
     return res;
   }
   async trigger(args: TriggerExecutionArgs) {
-    const res = await this.POST<SignalExecutionResponse>(`/executions/${args.id}/trigger`, { signal: args.signal, data: args.data }, args.idempotencyKey ? { "x-fns-idempotency-key": args.idempotencyKey } : {});
+    const res = await this.POST<SignalExecutionResponse>(
+      `/executions/${args.id}/trigger`,
+      { signal: args.signal, data: args.data },
+      args.idempotencyKey
+        ? { "x-fns-idempotency-key": args.idempotencyKey }
+        : {},
+    );
     return res;
   }
   async query<T>(args: QueryExecutionArgs) {
@@ -106,18 +129,27 @@ export class Fns {
   constructEvent(body: string, signature: string) {
     if (!this._options.dev) {
       if (!this._options.token) throw new Error("Token is required");
-      if (!verify(body, this._options.token, signature)) throw new Error("Invalid signature");
+      if (!verify(body, this._options.token, signature)) {
+        throw new Error("Invalid signature");
+      }
     }
     const event = JSON.parse(body);
     return event;
   }
-  async onHandler(event: FnsRequestParams, abortSignal: AbortSignal): Promise<FnsResponse> {
+  async onHandler(
+    event: FnsRequestParams,
+    abortSignal: AbortSignal,
+  ): Promise<FnsResponse> {
     const workflow = this._definitions.find((w) => w.name === event.name);
     if (!workflow) throw new Error(`Function ${event.name} not found`);
     const output = await this.engine(event, workflow.fn, abortSignal);
     return output as FnsResponse;
   }
-  private async engine(event: FnsRequestParams, fn: FnsFunction, abortSignal: AbortSignal): Promise<FnsResponse> {
+  private async engine(
+    event: FnsRequestParams,
+    fn: FnsFunction,
+    abortSignal: AbortSignal,
+  ): Promise<FnsResponse> {
     if (abortSignal.aborted) throw new Error("Aborted");
     let init = false;
     let pc = 0;
@@ -133,7 +165,7 @@ export class Fns {
     function unrollSignals() {
       if (steps.length === 0) return;
       while (steps.at(pc)?.type === "signal") {
-        const next = steps[pc++]
+        const next = steps[pc++];
         if (!next) return;
         const { signal } = next.params as { signal: string };
         const cb = signals.get(signal);
@@ -141,7 +173,13 @@ export class Fns {
         cb(next.result);
       }
     }
-    async function memo(id: string, type: StepType, params: any, write: (done: (res: any) => void) => any | Promise<any> = () => {}, complete: (res: any) => void = () => {}) {
+    async function memo(
+      id: string,
+      type: StepType,
+      params: any,
+      write: (done: (res: any) => void) => any | Promise<any> = () => {},
+      complete: (res: any) => void = () => {},
+    ) {
       if (!init) throw new NonRetriableError("must be initialized");
       const step = steps[pc++];
       unrollSignals();
@@ -149,38 +187,71 @@ export class Fns {
         mutations.push({ id, type, params, completed: false });
         return await block();
       }
-      if (step.id !== id) throw new NonRetriableError(`Invalid step id ${step.id} expected ${id}`);
+      if (step.id !== id) {
+        throw new NonRetriableError(
+          `Invalid step id ${step.id} expected ${id}`,
+        );
+      }
       if (step.completed) { // completed
         complete(step.result);
         return step.result;
       }
       const start = performance.now();
-      await Promise.resolve(write((result) => mutations.push({ id, result, elapsed: Math.round(performance.now() - start), completed: true })));
+      await Promise.resolve(
+        write((result) =>
+          mutations.push({
+            id,
+            result,
+            elapsed: Math.round(performance.now() - start),
+            completed: true,
+          })
+        ),
+      );
       return await block();
     }
     async function run<T = any>(id: string, cb: () => T | Promise<T>) {
       return await memo(id, "run", {}, async (done) => {
         const res = await Promise.resolve(cb());
-        done(res)
+        done(res);
       });
     }
     async function sleep(id: string, timeout: string | number) {
-      return await memo(id, "sleep", { timeout: typeof timeout === 'string' ? ms(timeout) : timeout }, (done) => {});
+      return await memo(id, "sleep", {
+        timeout: typeof timeout === "string" ? ms(timeout) : timeout,
+      }, (done) => {});
     }
     async function sleepUntil(id: string, until: Date | string) {
-      return await memo(id, "sleep", { until: typeof until === 'string' ? until : until.toISOString() }, () => {});
+      return await memo(id, "sleep", {
+        until: typeof until === "string" ? until : until.toISOString(),
+      }, () => {});
     }
-    async function condition (id: string, cb: () => boolean, timeout?: string | number) {
-      return await memo(id, "condition", { timeout: typeof timeout === 'string' ? ms(timeout) : timeout }, (done) => cb() && done(true));
+    async function condition(
+      id: string,
+      cb: () => boolean,
+      timeout?: string | number,
+    ) {
+      return await memo(id, "condition", {
+        timeout: typeof timeout === "string" ? ms(timeout) : timeout,
+      }, (done) => cb() && done(true));
     }
-    async function lock(id: string, keys: string[], timeout?: string | number): Promise<boolean> {
-      return await memo(id, "lock", { keys, timeout: typeof timeout === 'string' ? ms(timeout) : timeout }, () => {}, (res) => {
-        if (res) {
-          for (let i = 0; i < keys.length; i++) {
-            mutexes.add(keys[i])
+    async function lock(
+      id: string,
+      keys: string[],
+      timeout?: string | number,
+    ): Promise<boolean> {
+      return await memo(
+        id,
+        "lock",
+        { keys, timeout: typeof timeout === "string" ? ms(timeout) : timeout },
+        () => {},
+        (res) => {
+          if (res) {
+            for (let i = 0; i < keys.length; i++) {
+              mutexes.add(keys[i]);
+            }
           }
-        }
-      });
+        },
+      );
     }
     async function unlock(id: string, keys?: string[]): Promise<void> {
       const cb = () => {
@@ -189,17 +260,37 @@ export class Fns {
           return;
         }
         for (let i = 0; i < keys.length; i++) mutexes.delete(keys[i]);
-      }
+      };
       return await memo(id, "unlock", { keys }, () => {}, cb);
     }
-    function useState<T = any>(id: string, initial?: T): [StateGetter<typeof initial>, (newState: typeof initial | ((prevState: typeof initial) => typeof initial)) => void] {
-      if (init) throw new NonRetriableError("useState must be called at initialization");
+    function useState<T = any>(
+      id: string,
+      initial?: T,
+    ): [
+      StateGetter<typeof initial>,
+      (
+        newState:
+          | typeof initial
+          | ((prevState: typeof initial) => typeof initial),
+      ) => void,
+    ] {
+      if (init) {
+        throw new NonRetriableError(
+          "useState must be called at initialization",
+        );
+      }
       if (!(id in state)) {
         state[id] = initial;
         stateChanges.add(id);
       }
-      function SetState(newState: (typeof initial | ((prevState: typeof initial) => typeof initial))) {
-        state[id] = typeof newState === 'function' ? (newState as any)(state[id]) : newState;
+      function SetState(
+        newState:
+          | typeof initial
+          | ((prevState: typeof initial) => typeof initial),
+      ) {
+        state[id] = typeof newState === "function"
+          ? (newState as any)(state[id])
+          : newState;
         stateChanges.add(id);
       }
       function GetState() {
@@ -209,8 +300,14 @@ export class Fns {
       return [GetState, SetState];
     }
     function useSignal<T = any>(signal: string, cb?: (data: T) => void) {
-      if (init) throw new NonRetriableError("useSignal must be called at initialization");
-      if (signals.has(signal)) throw new NonRetriableError(`Signal ${signal} already in use`);
+      if (init) {
+        throw new NonRetriableError(
+          "useSignal must be called at initialization",
+        );
+      }
+      if (signals.has(signal)) {
+        throw new NonRetriableError(`Signal ${signal} already in use`);
+      }
       //const [signalValue, setSignalState] = useState<T>();
       signals.set(signal, (value: T) => {
         //setSignalState(value);
@@ -219,40 +316,79 @@ export class Fns {
       //if (signalValue() !== undefined) cb?.(signalValue()!);
       //return signalValue;
     }
-    function useQuery<T = any>(query: string, cb: () => T, dependencies: StateGetter[] = []) {
-      if (init) throw new NonRetriableError("useQuery must be called at initialization");
+    function useQuery<T = any>(
+      query: string,
+      cb: () => T,
+      dependencies: StateGetter[] = [],
+    ) {
+      if (init) {
+        throw new NonRetriableError(
+          "useQuery must be called at initialization",
+        );
+      }
       if (!queries.find((q) => q.name === query)) {
-        queries.push({ name: query, cb, dependencies: dependencies.map((dep) => dep.id) });
+        queries.push({
+          name: query,
+          cb,
+          dependencies: dependencies.map((dep) => dep.id),
+        });
         return;
       }
       throw new NonRetriableError(`Query ${query} already in use`);
     }
     function useFunctions(names: string[]) {
       const interfaces = {} as Record<string, any>;
-      for(let i = 0; i < names.length; i++) {
+      for (let i = 0; i < names.length; i++) {
         const name = names[i];
         interfaces[name] = {
           get: async (id: string, options: { id: string }) => {
-            return await memo(id, "get", { id: options.id }, () => {})
+            return await memo(id, "get", { id: options.id }, () => {});
           },
           invoke: async (id: string, options: { id?: string; data: any }) => {
-            return await memo(id, "invoke", { id: id ?? null, name, data: options.data }, () => {});
+            return await memo(id, "invoke", {
+              id: id ?? null,
+              name,
+              data: options.data,
+            }, () => {});
           },
-          trigger: async (id: string, options: { id: string; signal: string; data: any }) => {
-            return await memo(id, "trigger", { id, name, signal: options.signal, data: options.data }, () => {});
+          trigger: async (
+            id: string,
+            options: { id: string; signal: string; data: any },
+          ) => {
+            return await memo(id, "trigger", {
+              id,
+              name,
+              signal: options.signal,
+              data: options.data,
+            }, () => {});
           },
           query: async (id: string, options: { id: string; query: string }) => {
-            return await memo(id, "query", { id, name, query: options.query }, () => {});
+            return await memo(
+              id,
+              "query",
+              { id, name, query: options.query },
+              () => {},
+            );
           },
-          result: async (id: string, options: { id: string; query: string }) => {
-            return await memo(id, "query", { id, name, query: options.query }, () => {});
-          }
+          result: async (
+            id: string,
+            options: { id: string; query: string },
+          ) => {
+            return await memo(
+              id,
+              "query",
+              { id, name, query: options.query },
+              () => {},
+            );
+          },
         };
       }
       return interfaces;
     }
     const bootstrap = await fn({ useSignal, useQuery, useState, useFunctions });
-    if (typeof bootstrap !== 'function') throw new NonRetriableError("must return a function");
+    if (typeof bootstrap !== "function") {
+      throw new NonRetriableError("must return a function");
+    }
     unrollSignals();
     init = true;
     let isCompleted, result;
@@ -262,7 +398,7 @@ export class Fns {
         ctx: {
           id: event.id,
           run_id: event.run_id,
-          data: event.data
+          data: event.data,
         },
         step: {
           run,
@@ -273,7 +409,7 @@ export class Fns {
           unlock,
           checkpoint: function (): Promise<boolean> {
             throw new Error("Function not implemented.");
-          }
+          },
         },
         logger: {
           info(...args: any[]) {
@@ -287,8 +423,8 @@ export class Fns {
           },
           debug(...args: any[]) {
             console.debug(...args);
-          }
-        }
+          },
+        },
       }));
     } catch (er: any) {
       let retryable = true;
@@ -299,36 +435,52 @@ export class Fns {
           message: er.message,
           stack: er.stack ?? "",
           name: er.name,
-          retryable
+          retryable,
         },
-      }
-    };
-    const applyState = Object.fromEntries(Array.from(stateChanges).map((id) => [id, state[id]]))
-    const applyQueries = Object.fromEntries(queries
-      .filter((q) => q.dependencies.length == 0 || q.dependencies.some((dep) => stateChanges.has(dep)))
-      .map((q) => [q.name, q.cb()]));
+      };
+    }
+    const applyState = Object.fromEntries(
+      Array.from(stateChanges).map((id) => [id, state[id]]),
+    );
+    const applyQueries = Object.fromEntries(
+      queries
+        .filter((q) =>
+          q.dependencies.length == 0 ||
+          q.dependencies.some((dep) => stateChanges.has(dep))
+        )
+        .map((q) => [q.name, q.cb()]),
+    );
 
-    if(isCompleted) {
+    if (isCompleted) {
       return {
         completed: true,
         result,
-        ... Object.keys(applyQueries).length > 0 ? { queries: applyQueries } : {},
-      }
+        ...Object.keys(applyQueries).length > 0
+          ? { queries: applyQueries }
+          : {},
+      };
     }
     return {
       completed: false,
       mutations,
-      ... stateChanges.size > 0 ? { state: applyState } : {},
-      ... Object.keys(applyQueries).length > 0 ? { queries: applyQueries } : {},
-    }
+      ...stateChanges.size > 0 ? { state: applyState } : {},
+      ...Object.keys(applyQueries).length > 0 ? { queries: applyQueries } : {},
+    };
   }
   public getConfig() {
     return {
       checksum: this._ver,
-      definitions: this._definitions
-    }
+      definitions: this._definitions,
+    };
   }
-  createFunction({name, version, schema}: { name: string, version: number, schema?: Schema }, fn: FnsFunction) {
+  createFunction(
+    { name, version, schema }: {
+      name: string;
+      version: number;
+      schema?: Schema;
+    },
+    fn: FnsFunction,
+  ) {
     const states: Record<string, any> = {};
     const queries: Set<string> = new Set();
     const signals: Set<string> = new Set();
@@ -352,9 +504,11 @@ export class Fns {
             funcs.add(names[i]);
           }
           return {} as any;
-        }
-      })
-      if (typeof output !== 'function') throw new Error("Function must return a function");
+        },
+      });
+      if (typeof output !== "function") {
+        throw new Error("Function must return a function");
+      }
     } catch (err) {
       throw new Error(`Failed to create function ${name}:${version}`);
     }
@@ -366,13 +520,13 @@ export class Fns {
       funcs: Array.from(funcs),
       queries: Array.from(queries),
       signals: Array.from(signals),
-      schema: schema ?? {}
+      schema: schema ?? {},
     });
     this._ver = xxHash32(
       this._definitions
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((w) => (`${w.name}:${w.version}`))
-        .join(";")
+        .join(";"),
     );
   }
 }

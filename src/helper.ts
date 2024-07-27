@@ -1,4 +1,5 @@
-export const resolveNextTick = (timeouts: number[]) => new Promise((resolve) => timeouts.push(setTimeout(resolve, 0)));
+export const resolveNextTick = (timeouts: number[]) =>
+  new Promise((resolve) => timeouts.push(setTimeout(resolve, 0)));
 export const execute = async (fn: any) => {
   const timeouts: number[] = [];
   function clear() {
@@ -8,16 +9,16 @@ export const execute = async (fn: any) => {
   }
   try {
     const result = await Promise.race([
-      fn.then((data:any) => [true, data]),
+      fn.then((data: any) => [true, data]),
       resolveNextTick(timeouts).then(() => [false, null]),
     ]);
     clear();
     return result;
-  } catch(err) {
+  } catch (err) {
     clear();
     throw err;
   }
 };
 export const block = () => new Promise(() => {}) as Promise<any>;
 
-export default { resolveNextTick, execute, block }
+export default { resolveNextTick, execute, block };

@@ -3,19 +3,21 @@ import { assertEquals } from "jsr:@std/assert@^0.225.3";
 import { Fns } from "./index.ts";
 import { FnsRequestParams } from "./types.ts";
 
-
 const fns = new Fns({ dev: true, token: "test" });
 
-fns.createFunction({ name: "SimpleSequentialWorkflow", version: 1 }, () => async ({ step }) => {
-  const firstName = await step.run("define-firstname", () => {
-    return "lucas";
-  });
-  await step.sleep("wait-10s", "10s");
-  const lastName = await step.run("define-lastname", () => {
-    return "fernandes";
-  });
-  return `Hello ${firstName} ${lastName}`;
-});
+fns.createFunction(
+  { name: "SimpleSequentialWorkflow", version: 1 },
+  () => async ({ step }) => {
+    const firstName = await step.run("define-firstname", () => {
+      return "lucas";
+    });
+    await step.sleep("wait-10s", "10s");
+    const lastName = await step.run("define-lastname", () => {
+      return "fernandes";
+    });
+    return `Hello ${firstName} ${lastName}`;
+  },
+);
 
 Deno.test("Simple sequential workflow", async (t) => {
   const initial: FnsRequestParams = {
@@ -25,7 +27,7 @@ Deno.test("Simple sequential workflow", async (t) => {
     data: {},
     steps: [],
     state: {},
-    snapshot: false
+    snapshot: false,
   };
   const abortSignal = new AbortController().signal;
   await t.step("init define-firstname", async () => {
@@ -37,13 +39,13 @@ Deno.test("Simple sequential workflow", async (t) => {
           id: "define-firstname",
           type: "run",
           params: {} as any,
-          completed: false
-        }
-      ]
+          completed: false,
+        },
+      ],
     });
   });
   await t.step("memo define-firstname", async () => {
-    const params:  FnsRequestParams = {
+    const params: FnsRequestParams = {
       ...initial,
       steps: [
         {
@@ -51,9 +53,9 @@ Deno.test("Simple sequential workflow", async (t) => {
           type: "run",
           params: {} as any,
           completed: false,
-          result: undefined
-        }
-      ]
+          result: undefined,
+        },
+      ],
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
@@ -63,13 +65,13 @@ Deno.test("Simple sequential workflow", async (t) => {
           id: "define-firstname",
           completed: true,
           elapsed: 0,
-          result: "lucas"
-        }
-      ]
+          result: "lucas",
+        },
+      ],
     });
   });
   await t.step("define wait-10s", async () => {
-    const params:  FnsRequestParams = {
+    const params: FnsRequestParams = {
       ...initial,
       steps: [
         {
@@ -77,9 +79,9 @@ Deno.test("Simple sequential workflow", async (t) => {
           completed: true,
           result: "lucas",
           type: "run",
-          params: {} as any
-        }
-      ]
+          params: {} as any,
+        },
+      ],
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
@@ -89,9 +91,9 @@ Deno.test("Simple sequential workflow", async (t) => {
           id: "wait-10s",
           type: "sleep",
           params: { timeout: 10000 },
-          completed: false
-        }
-      ]
+          completed: false,
+        },
+      ],
     });
     /*initial.steps.push({
       completed: false,
@@ -102,7 +104,7 @@ Deno.test("Simple sequential workflow", async (t) => {
     })*/
   });
   await t.step("wait wait-10s", async () => {
-    const params:  FnsRequestParams = {
+    const params: FnsRequestParams = {
       ...initial,
       steps: [
         {
@@ -110,25 +112,25 @@ Deno.test("Simple sequential workflow", async (t) => {
           completed: true,
           result: "lucas",
           type: "run",
-          params: {} as any
+          params: {} as any,
         },
         {
           id: "wait-10s",
           type: "sleep",
           params: { timeout: 10000 },
           result: null,
-          completed: false
-        }
-      ]
+          completed: false,
+        },
+      ],
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
       completed: false,
-      mutations: []
+      mutations: [],
     });
   });
   await t.step("define lastname", async () => {
-    const params:  FnsRequestParams = {
+    const params: FnsRequestParams = {
       ...initial,
       steps: [
         {
@@ -136,16 +138,16 @@ Deno.test("Simple sequential workflow", async (t) => {
           completed: true,
           result: "lucas",
           type: "run",
-          params: {} as any
+          params: {} as any,
         },
         {
           id: "wait-10s",
           type: "sleep",
           params: { timeout: 10000 },
           result: null,
-          completed: true
-        }
-      ]
+          completed: true,
+        },
+      ],
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
@@ -161,7 +163,7 @@ Deno.test("Simple sequential workflow", async (t) => {
     });
   });
   await t.step("memo lastname", async () => {
-    const params:  FnsRequestParams = {
+    const params: FnsRequestParams = {
       ...initial,
       steps: [
         {
@@ -169,28 +171,28 @@ Deno.test("Simple sequential workflow", async (t) => {
           completed: true,
           result: "lucas",
           type: "run",
-          params: {} as any
+          params: {} as any,
         },
         {
           id: "wait-10s",
           type: "sleep",
           params: { timeout: 10000 },
           result: null,
-          completed: true
+          completed: true,
         },
         {
           completed: true,
           id: "define-lastname",
           params: {} as any,
           type: "run",
-          result: "marie"
+          result: "marie",
         },
-      ]
+      ],
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
       completed: true,
-      result: "Hello lucas marie"
+      result: "Hello lucas marie",
     });
   });
 });
