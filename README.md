@@ -33,12 +33,12 @@ with any framework and platform.
 
 ## License
 
-<a href="https://opensource.org/licenses/MIT">
-  <img align="right" height="96" alt="MIT License" src="https://branding.cute.engineering/licenses/mit.svg" />
+<a href="https://opensource.org/license/apache-2-0">
+  <img align="right" height="96" alt="MIT License" src="https://opensource.org/wp-content/themes/osi/assets/img/osi-badge-dark.svg" />
 </a>
 
-The Fns SDK and its integrations are licensed under the **MIT License**.
+The Fns SDK and its integrations are licensed under the **Apache-2 License**.
 
 The full text of the license can be accessed via
-[this link](https://opensource.org/licenses/MIT) and is also included in the
+[this link](https://opensource.org/license/apache-2-0) and is also included in the
 [LICENSE.md](LICENSE.md) file of this software package.
