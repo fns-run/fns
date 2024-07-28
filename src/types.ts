@@ -36,7 +36,11 @@ export type FnsRemoteFunction = {
 };
 export type FnsFunctionParams = {
   useSignal<T = unknown>(name: string, cb: (data: T) => void): void; // TODO: () => T | undefined;
-  useQuery<T = unknown>(name: string, cb: () => T, dependencies?: StateGetter[]): void; // trouver un moyen de detecter les dépendances avec microtasks et potentiellement ne pas demander de dépendances
+  useQuery<T = unknown>(
+    name: string,
+    cb: () => T,
+    dependencies?: StateGetter[],
+  ): void; // trouver un moyen de detecter les dépendances avec microtasks et potentiellement ne pas demander de dépendances
   useState<T = unknown>(
     id: string,
     initial?: T,

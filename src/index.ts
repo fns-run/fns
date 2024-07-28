@@ -205,11 +205,14 @@ export class Fns {
       );
       return await block<T>();
     }
-    async function run<T = unknown>(id: string, cb: () => T | Promise<T>): Promise<T> {
+    async function run<T = unknown>(
+      id: string,
+      cb: () => T | Promise<T>,
+    ): Promise<T> {
       return await memo<T>(id, "run", null, async (done) => {
         const res = await Promise.resolve(cb());
         done(res);
-      })
+      });
     }
     async function sleep(id: string, timeout: string | number): Promise<void> {
       return await memo<void>(id, "sleep", {
@@ -271,7 +274,13 @@ export class Fns {
         }
         for (let i = 0; i < keys.length; i++) mutexes.delete(keys[i]);
       };
-      return await memo<void>(id, "unlock", keys ? { keys } : null, () => {}, cb);
+      return await memo<void>(
+        id,
+        "unlock",
+        keys ? { keys } : null,
+        () => {},
+        cb,
+      );
     }
     function useState<T = unknown>(
       id: string,
