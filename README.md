@@ -1,4 +1,4 @@
-![Fns Screenshot](doc/assets/fns.png)
+![Fns Screenshot](assets/fns.png)
 
 ## About
 
@@ -12,7 +12,7 @@
 **Fns SDK** is a serverless stateless durable function design pattern. Works
 with any framework and platform.
 
-<img src="doc/assets/example.png" alt="drawing" width="500"/>
+<img src="assets/example.png" alt="drawing" width="500"/>
 
 ## Key Features
 
