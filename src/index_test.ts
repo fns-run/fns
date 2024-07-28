@@ -1,13 +1,27 @@
 // url_test.ts
-import { assertEquals } from "jsr:@std/assert@^0.225.3";
+import { assert, assertEquals } from "jsr:@std/assert@^0.225.3";
 import { Fns } from "./index.ts";
 import { FnsRequestParams } from "./types.ts";
 
-const fns = new Fns({ dev: true, token: "test" });
+function buildInstance(name: string, data?: unknown): FnsRequestParams {
+  return {
+    id: Math.floor(Math.random() * 1000000000).toString(),
+    run_id: Math.floor(Math.random() * 1000000000).toString(),
+    name,
+    data,
+    steps: [],
+    state: {},
+    snapshot: false,
+  };
+}
+
+const fns = new Fns({ dev: false, token: "test" });
 
 fns.createFunction(
-  { name: "SimpleSequentialWorkflow", version: 1 },
-  () => async ({ step }) => {
+  { name: "DefineFirstNameAndLastName", version: 1 },
+  () => async ({ step, ctx }) => {
+    const data = ctx.data as { prefix: string };
+    assert(data.prefix, "prefix is required");
     const firstName = await step.run("define-firstname", () => {
       return "lucas";
     });
@@ -15,20 +29,28 @@ fns.createFunction(
     const lastName = await step.run("define-lastname", () => {
       return "fernandes";
     });
-    return `Hello ${firstName} ${lastName}`;
+    return `Hello ${data.prefix} ${firstName} ${lastName}`;
   },
 );
 
-Deno.test("Simple sequential workflow", async (t) => {
-  const initial: FnsRequestParams = {
-    id: "test_id",
-    run_id: "test_run_id",
-    name: "SimpleSequentialWorkflow",
-    data: {},
-    steps: [],
-    state: {},
-    snapshot: false,
-  };
+fns.createFunction(
+  { name: "LockerToUnlock", version: 1 },
+  ({ useSignal }) => {
+    let locked: boolean = true;
+    useSignal("unlock", () => locked = false);
+    return async ({ step, ctx }) => {
+      const data = ctx.data as { isLocked: boolean };
+      if (data && data.isLocked !== undefined) {
+        locked = data.isLocked;
+      }
+      await step.condition("wait-unlock", () => locked === false);
+      return "unlocked";
+    };
+  },
+);
+
+Deno.test("DefineFirstNameAndLastName", async (t) => {
+  const initial = buildInstance("DefineFirstNameAndLastName", { prefix: "Mr" });
   const abortSignal = new AbortController().signal;
   await t.step("init define-firstname", async () => {
     const result = await fns.onHandler(initial, abortSignal);
@@ -38,7 +60,7 @@ Deno.test("Simple sequential workflow", async (t) => {
         {
           id: "define-firstname",
           type: "run",
-          params: {} as any,
+          params: null,
           completed: false,
         },
       ],
@@ -51,7 +73,7 @@ Deno.test("Simple sequential workflow", async (t) => {
         {
           id: "define-firstname",
           type: "run",
-          params: {} as any,
+          params: null,
           completed: false,
           result: undefined,
         },
@@ -79,7 +101,7 @@ Deno.test("Simple sequential workflow", async (t) => {
           completed: true,
           result: "lucas",
           type: "run",
-          params: {} as any,
+          params: null,
         },
       ],
     };
@@ -95,13 +117,6 @@ Deno.test("Simple sequential workflow", async (t) => {
         },
       ],
     });
-    /*initial.steps.push({
-      completed: false,
-      id: "wait-10s",
-      type: "sleep",
-      params: { timeout: 10000 },
-      result: undefined
-    })*/
   });
   await t.step("wait wait-10s", async () => {
     const params: FnsRequestParams = {
@@ -112,7 +127,7 @@ Deno.test("Simple sequential workflow", async (t) => {
           completed: true,
           result: "lucas",
           type: "run",
-          params: {} as any,
+          params: null,
         },
         {
           id: "wait-10s",
@@ -138,7 +153,7 @@ Deno.test("Simple sequential workflow", async (t) => {
           completed: true,
           result: "lucas",
           type: "run",
-          params: {} as any,
+          params: null,
         },
         {
           id: "wait-10s",
@@ -156,7 +171,7 @@ Deno.test("Simple sequential workflow", async (t) => {
         {
           completed: false,
           id: "define-lastname",
-          params: {} as any,
+          params: null,
           type: "run",
         },
       ],
@@ -171,7 +186,7 @@ Deno.test("Simple sequential workflow", async (t) => {
           completed: true,
           result: "lucas",
           type: "run",
-          params: {} as any,
+          params: null,
         },
         {
           id: "wait-10s",
@@ -183,7 +198,7 @@ Deno.test("Simple sequential workflow", async (t) => {
         {
           completed: true,
           id: "define-lastname",
-          params: {} as any,
+          params: null,
           type: "run",
           result: "marie",
         },
@@ -192,7 +207,84 @@ Deno.test("Simple sequential workflow", async (t) => {
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
       completed: true,
-      result: "Hello lucas marie",
+      result: "Hello Mr lucas marie",
+    });
+  });
+});
+Deno.test("LockerToUnlock", async (t) => {
+  const initial = buildInstance("LockerToUnlock", { isLocked: true });
+  const abortSignal = new AbortController().signal;
+  await t.step("init condition", async () => {
+    const result = await fns.onHandler(initial, abortSignal);
+    assertEquals(result, {
+      completed: false,
+      mutations: [
+        {
+          id: "wait-unlock",
+          params: null,
+          type: "condition",
+          completed: false,
+        },
+      ],
+    });
+  });
+  await t.step("signal unlocking", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "wait-unlock",
+          type: "run",
+          params: null,
+          result: undefined,
+          completed: false,
+        },
+        {
+          id: "signal",
+          type: "signal",
+          params: { signal: "unlock" },
+          result: undefined,
+          completed: true,
+        },
+      ],
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      completed: false,
+      mutations: [
+        {
+          id: "wait-unlock",
+          result: true,
+          elapsed: 0,
+          completed: true,
+        },
+      ],
+    });
+  });
+  await t.step("completed", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "wait-unlock",
+          type: "run",
+          params: null,
+          result: true,
+          completed: true,
+        },
+        {
+          id: "signal",
+          type: "signal",
+          params: { signal: "unlock" },
+          result: undefined,
+          completed: true,
+        },
+      ],
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      completed: true,
+      result: "unlocked",
     });
   });
 });

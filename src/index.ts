@@ -1,37 +1,31 @@
 import { verify } from "./signature.ts";
-import { ms } from "https://raw.githubusercontent.com/denolib/ms/d9e99a2fa10a9dc8d4cd97b8de1be10c57bf6e77/ms.ts";
+import { ms } from "../deps.ts";
 import {
   FnsFunction,
+  FnsRemoteFunction,
   FnsRequestParams,
   FnsResponse,
   Mutation,
   NonRetriableError,
+  Params,
+  Query,
   Schema,
+  StateGetter,
   StepType,
 } from "./types.ts";
 import { block, execute } from "./helper.ts";
 import { xxHash32 } from "./xxhash32.ts";
 
 export const FNS_SIGNATURE_HEADER = "x-fns-signature";
-
-interface Query {
-  name: string;
-  cb: () => any;
-  dependencies: string[];
-}
-type Callback<T = any> = () => T;
-interface StateGetter<T = any> extends Callback<T> {
-  id: string;
-}
 interface StartExecutionArgs {
   id: string;
   name: string;
-  data: any;
+  data: unknown;
 }
 interface TriggerExecutionArgs {
   id: string;
   signal: string;
-  data: any;
+  data: unknown;
   idempotencyKey?: string;
 }
 interface QueryExecutionArgs {
@@ -56,7 +50,7 @@ interface FnsDefinition {
   name: string;
   fn: FnsFunction;
   version: number;
-  states: Record<string, any>;
+  states: Record<string, unknown>;
   funcs: string[];
   queries: string[];
   signals: string[];
@@ -71,9 +65,10 @@ export class Fns {
     this._options = options;
     this._ver = 0;
   }
-  private async POST<T = any>(
+  /* TODO: Seperate to a client class */
+  private async POST<T = unknown>(
     endpoint: string,
-    body: any,
+    body: unknown,
     headers: Record<string, string> = {},
   ): Promise<T> {
     if (!this._options.endpoint) throw new Error("Endpoint is required");
@@ -154,11 +149,11 @@ export class Fns {
     let init = false;
     let pc = 0;
     const steps = event.steps; // before [...event.steps]
-    const state: Record<string, any> = event.state ?? {};
+    const state: Record<string, unknown> = event.state ?? {};
     const stateChanges = new Set<string>();
     const mutations: Mutation[] = [];
 
-    const signals = new Map<string, any>();
+    const signals = new Map<string, (data: unknown) => void>();
     const queries: Query[] = [];
     const mutexes = new Set<string>();
 
@@ -173,19 +168,20 @@ export class Fns {
         cb(next.result);
       }
     }
-    async function memo(
+    async function memo<T = unknown>(
       id: string,
       type: StepType,
-      params: any,
-      write: (done: (res: any) => void) => any | Promise<any> = () => {},
-      complete: (res: any) => void = () => {},
-    ) {
+      params: Params,
+      write: (done: (res: unknown) => void) => unknown | Promise<unknown> =
+        () => {},
+      complete: (res: unknown) => void = () => {},
+    ): Promise<T> {
       if (!init) throw new NonRetriableError("must be initialized");
       const step = steps[pc++];
       unrollSignals();
       if (!step) { // initialize
         mutations.push({ id, type, params, completed: false });
-        return await block();
+        return await block<T>();
       }
       if (step.id !== id) {
         throw new NonRetriableError(
@@ -194,7 +190,7 @@ export class Fns {
       }
       if (step.completed) { // completed
         complete(step.result);
-        return step.result;
+        return step.result as T;
       }
       const start = performance.now();
       await Promise.resolve(
@@ -207,21 +203,21 @@ export class Fns {
           })
         ),
       );
-      return await block();
+      return await block<T>();
     }
-    async function run<T = any>(id: string, cb: () => T | Promise<T>) {
-      return await memo(id, "run", {}, async (done) => {
+    async function run<T = unknown>(id: string, cb: () => T | Promise<T>): Promise<T> {
+      return await memo<T>(id, "run", null, async (done) => {
         const res = await Promise.resolve(cb());
         done(res);
-      });
+      })
     }
-    async function sleep(id: string, timeout: string | number) {
-      return await memo(id, "sleep", {
-        timeout: typeof timeout === "string" ? ms(timeout) : timeout,
-      }, (done) => {});
+    async function sleep(id: string, timeout: string | number): Promise<void> {
+      return await memo<void>(id, "sleep", {
+        timeout: typeof timeout === "string" ? ms(timeout) as number : timeout,
+      }, () => {});
     }
-    async function sleepUntil(id: string, until: Date | string) {
-      return await memo(id, "sleep", {
+    async function sleepUntil(id: string, until: Date | string): Promise<void> {
+      return await memo<void>(id, "sleep", {
         until: typeof until === "string" ? until : until.toISOString(),
       }, () => {});
     }
@@ -229,20 +225,34 @@ export class Fns {
       id: string,
       cb: () => boolean,
       timeout?: string | number,
-    ) {
-      return await memo(id, "condition", {
-        timeout: typeof timeout === "string" ? ms(timeout) : timeout,
-      }, (done) => cb() && done(true));
+    ): Promise<boolean> {
+      return await memo<boolean>(
+        id,
+        "condition",
+        timeout
+          ? {
+            timeout: typeof timeout === "string"
+              ? ms(timeout) as number
+              : timeout,
+          }
+          : null,
+        (done) => cb() && done(true),
+      );
     }
     async function lock(
       id: string,
       keys: string[],
       timeout?: string | number,
     ): Promise<boolean> {
-      return await memo(
+      return await memo<boolean>(
         id,
         "lock",
-        { keys, timeout: typeof timeout === "string" ? ms(timeout) : timeout },
+        {
+          keys,
+          ...timeout
+            ? { timeout: typeof timeout === "string" ? ms(timeout) : timeout }
+            : {},
+        },
         () => {},
         (res) => {
           if (res) {
@@ -261,9 +271,9 @@ export class Fns {
         }
         for (let i = 0; i < keys.length; i++) mutexes.delete(keys[i]);
       };
-      return await memo(id, "unlock", { keys }, () => {}, cb);
+      return await memo<void>(id, "unlock", keys ? { keys } : null, () => {}, cb);
     }
-    function useState<T = any>(
+    function useState<T = unknown>(
       id: string,
       initial?: T,
     ): [
@@ -289,7 +299,7 @@ export class Fns {
           | ((prevState: typeof initial) => typeof initial),
       ) {
         state[id] = typeof newState === "function"
-          ? (newState as any)(state[id])
+          ? (newState as (previous: T) => T)(state[id] as T)
           : newState;
         stateChanges.add(id);
       }
@@ -299,7 +309,7 @@ export class Fns {
       GetState.id = id;
       return [GetState, SetState];
     }
-    function useSignal<T = any>(signal: string, cb?: (data: T) => void) {
+    function useSignal<T = unknown>(signal: string, cb?: (data: T) => void) {
       if (init) {
         throw new NonRetriableError(
           "useSignal must be called at initialization",
@@ -309,14 +319,14 @@ export class Fns {
         throw new NonRetriableError(`Signal ${signal} already in use`);
       }
       //const [signalValue, setSignalState] = useState<T>();
-      signals.set(signal, (value: T) => {
+      signals.set(signal, (value) => {
         //setSignalState(value);
-        cb?.(value);
+        cb?.(value as T);
       });
       //if (signalValue() !== undefined) cb?.(signalValue()!);
       //return signalValue;
     }
-    function useQuery<T = any>(
+    function useQuery<T = unknown>(
       query: string,
       cb: () => T,
       dependencies: StateGetter[] = [],
@@ -336,24 +346,26 @@ export class Fns {
       }
       throw new NonRetriableError(`Query ${query} already in use`);
     }
-    function useFunctions(names: string[]) {
-      const interfaces = {} as Record<string, any>;
+    function useFunctions(_names: string[]): Record<string, FnsRemoteFunction> {
+      throw new NonRetriableError("useFunctions not implemented");
+      /*
+      const interfaces = {};
       for (let i = 0; i < names.length; i++) {
         const name = names[i];
         interfaces[name] = {
           get: async (id: string, options: { id: string }) => {
             return await memo(id, "get", { id: options.id }, () => {});
           },
-          invoke: async (id: string, options: { id?: string; data: any }) => {
+          invoke: async (id: string, options: { id?: string; data?: unknown }) => {
             return await memo(id, "invoke", {
-              id: id ?? null,
+              id: options.id ?? null,
               name,
               data: options.data,
             }, () => {});
           },
           trigger: async (
             id: string,
-            options: { id: string; signal: string; data: any },
+            options: { id: string; signal: string; data?: unknown },
           ) => {
             return await memo(id, "trigger", {
               id,
@@ -384,6 +396,7 @@ export class Fns {
         };
       }
       return interfaces;
+      */
     }
     const bootstrap = await fn({ useSignal, useQuery, useState, useFunctions });
     if (typeof bootstrap !== "function") {
@@ -412,29 +425,29 @@ export class Fns {
           },
         },
         logger: {
-          info(...args: any[]) {
+          info(...args: unknown[]) {
             console.log(...args);
           },
-          warn(...args: any[]) {
+          warn(...args: unknown[]) {
             console.warn(...args);
           },
-          error(...args: any[]) {
+          error(...args: unknown[]) {
             console.error(...args);
           },
-          debug(...args: any[]) {
+          debug(...args: unknown[]) {
             console.debug(...args);
           },
         },
       }));
-    } catch (er: any) {
+    } catch (e) {
       let retryable = true;
-      if (er instanceof NonRetriableError) retryable = false;
+      if (e instanceof NonRetriableError) retryable = false;
       return {
         completed: false,
         error: {
-          message: er.message,
-          stack: er.stack ?? "",
-          name: er.name,
+          message: e.message,
+          stack: e.stack ?? "",
+          name: e.name,
           retryable,
         },
       };
@@ -481,7 +494,7 @@ export class Fns {
     },
     fn: FnsFunction,
   ) {
-    const states: Record<string, any> = {};
+    const states: Record<string, unknown> = {};
     const queries: Set<string> = new Set();
     const signals: Set<string> = new Set();
     const funcs: Set<string> = new Set();
@@ -493,7 +506,6 @@ export class Fns {
         },
         useSignal(name) {
           signals.add(name);
-          return () => undefined;
         },
         useState(name: string, initial) {
           states[name] = initial;
@@ -503,14 +515,16 @@ export class Fns {
           for (let i = 0; i < names.length; i++) {
             funcs.add(names[i]);
           }
-          return {} as any;
+          return {};
         },
       });
       if (typeof output !== "function") {
         throw new Error("Function must return a function");
       }
-    } catch (err) {
-      throw new Error(`Failed to create function ${name}:${version}`);
+    } catch (e) {
+      throw new Error(
+        `Failed to create function ${name}:${version} with message: ${e.message}`,
+      );
     }
     this._definitions.push({
       name,

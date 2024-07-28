@@ -13,8 +13,8 @@ export const serve = (client: Fns) => {
       );
       const result = await client.onHandler(event, abortController.signal);
       return res.json(result);
-    } catch (err: any) {
-      return res.status(400).send(`Internal Server Error: ${err.message}`);
+    } catch (e) {
+      return res.status(400).send(`Internal Server Error: ${e.message}`);
     }
   };
 };

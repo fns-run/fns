@@ -1,3 +1,12 @@
+export interface Query {
+  name: string;
+  cb: () => unknown;
+  dependencies: string[];
+}
+export type Callback<T = unknown> = () => T;
+export interface StateGetter<T = unknown> extends Callback<T> {
+  id: string;
+}
 export class NonRetriableError extends Error {
   constructor(message: string) {
     super(message);
@@ -9,10 +18,26 @@ export interface FnsQueryValue<T> {
   timestamp: string;
   version: number;
 }
+export type FnsRemoteFunction = {
+  get<T = unknown>(id: string, options: { id: string }): Promise<T>;
+  invoke<T = unknown>(
+    id: string,
+    options: { id?: string; data?: unknown },
+  ): Promise<T>;
+  trigger(
+    id: string,
+    options: { id: string; signal: string; data?: unknown },
+  ): Promise<void>;
+  query<T = unknown>(
+    id: string,
+    options: { id: string; query: string },
+  ): Promise<FnsQueryValue<T>>;
+  result<T = unknown>(id: string): Promise<T>;
+};
 export type FnsFunctionParams = {
-  useSignal<T = any>(name: string, cb: (data: T) => void): void; // TODO: () => T | undefined;
-  useQuery<T = any>(name: string, cb: () => T, dependencies?: any[]): void; // trouver un moyen de detecter les dépendances avec microtasks et potentiellement ne pas demander de dépendances
-  useState<T = any>(
+  useSignal<T = unknown>(name: string, cb: (data: T) => void): void; // TODO: () => T | undefined;
+  useQuery<T = unknown>(name: string, cb: () => T, dependencies?: StateGetter[]): void; // trouver un moyen de detecter les dépendances avec microtasks et potentiellement ne pas demander de dépendances
+  useState<T = unknown>(
     id: string,
     initial?: T,
   ): [
@@ -23,40 +48,25 @@ export type FnsFunctionParams = {
         | ((prevState: typeof initial) => typeof initial),
     ) => void,
   ];
-  useFunctions(functions: string[]): Record<string, {
-    get<T = any>(id: string, options: { id: string }): Promise<T>;
-    invoke<T = any>(
-      id: string,
-      options: { id?: string; data: any },
-    ): Promise<T>;
-    trigger(
-      id: string,
-      options: { id: string; signal: string; data: any },
-    ): Promise<void>;
-    query<T = any>(
-      id: string,
-      options: { id: string; query: string },
-    ): Promise<FnsQueryValue<T>>;
-    result<T = any>(id: string): Promise<T>;
-  }>;
+  useFunctions(functions: string[]): Record<string, FnsRemoteFunction>;
 };
 export interface Logger {
-  info(...args: any[]): void;
-  warn(...args: any[]): void;
-  error(...args: any[]): void;
-  debug(...args: any[]): void;
+  info(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  error(...args: unknown[]): void;
+  debug(...args: unknown[]): void;
 }
 export type FnsFunction = (params: FnsFunctionParams) => (execution: {
   ctx: {
     id: string;
     run_id: string;
-    data: any;
+    data: unknown;
   };
   step: {
     // enlever les options et mettre juste fn
     // mettre en place une vérification des ids uniques et slugify correct
     checkpoint(): Promise<boolean>;
-    run<T = any>(id: string, step: () => T | Promise<T>): Promise<T>; // potentiellement mettre des paramètres
+    run<T = unknown>(id: string, step: () => T | Promise<T>): Promise<T>; // potentiellement mettre des paramètres
     condition(
       id: string,
       cb: () => boolean,
@@ -74,18 +84,24 @@ export type FnsFunction = (params: FnsFunctionParams) => (execution: {
   };
   logger: Logger;
   abortSignal: AbortSignal;
-}) => Promise<any>;
+}) => Promise<unknown>;
 
 export type FnsRequestParams = {
   id: string;
   run_id: string;
   name: string;
-  data: any;
+  data: unknown;
   snapshot: boolean;
   steps: Step[];
-  state: Record<string, any>;
+  state: Record<string, unknown>;
 };
 
+export type Params =
+  | { signal: string }
+  | { timeout: number }
+  | { until: string }
+  | { keys: string[] }
+  | null;
 export type StepType =
   | "run"
   | "sleep"
@@ -100,21 +116,17 @@ export type StepType =
 export type Step = {
   id: string;
   type: StepType;
-  params: { signal: string } | { timeout: number } | { until: string } | {
-    keys: string[];
-  } | null;
+  params: Params;
   completed: boolean;
-  result: any;
+  result: unknown;
 };
 export type MutationInitization = {
   type: StepType;
-  params: { signal: string } | { timeout: number } | { until: string } | {
-    keys: string[];
-  } | null;
+  params: Params;
 };
 export type MutationCompleted = {
   completed: true;
-  result: any;
+  result: unknown;
   elapsed: number;
 };
 export type Mutation =
@@ -123,12 +135,12 @@ export type Mutation =
 
 export type FnsCompletedResponse = {
   completed: true;
-  result: any;
+  result: unknown;
 };
 export type FnsIncompleteResponse = {
   completed: false;
   mutations: Mutation[];
-  state?: Record<string, any>;
+  state?: Record<string, unknown>;
 };
 export type FnsErrorResponse = {
   completed: false;
@@ -140,10 +152,10 @@ export type FnsErrorResponse = {
   };
 };
 export type FnsResponse =
-  & { completed: boolean; queries?: Record<string, any> }
+  & { completed: boolean; queries?: Record<string, unknown> }
   & (FnsCompletedResponse | FnsIncompleteResponse | FnsErrorResponse);
 
 export type Schema = {
-  data?: any; // to define
-  signals?: Record<string, any>; // to define
+  data?: unknown; // to define, replace unknown with JSON schema
+  signals?: Record<string, unknown>; // to define, replace unknown with JSON schema
 };

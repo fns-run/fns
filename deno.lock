@@ -4,8 +4,6 @@
     "specifiers": {
       "jsr:@deno/cache-dir@^0.8.0": "jsr:@deno/cache-dir@0.8.0",
       "jsr:@deno/dnt@^0.41.1": "jsr:@deno/dnt@0.41.1",
-      "jsr:@deno/graph@^0.69.7": "jsr:@deno/graph@0.69.10",
-      "jsr:@std/assert": "jsr:@std/assert@0.225.3",
       "jsr:@std/assert@^0.218.2": "jsr:@std/assert@0.218.2",
       "jsr:@std/assert@^0.225.3": "jsr:@std/assert@0.225.3",
       "jsr:@std/bytes@^0.218.2": "jsr:@std/bytes@0.218.2",
@@ -30,7 +28,6 @@
       "@deno/cache-dir@0.8.0": {
         "integrity": "e87e80a404958f6350d903e6238b72afb92468378b0b32111f7a1e4916ac7fe7",
         "dependencies": [
-          "jsr:@deno/graph@^0.69.7",
           "jsr:@std/fmt@^0.218.2",
           "jsr:@std/fs@^0.218.2",
           "jsr:@std/io@^0.218.2",
@@ -47,9 +44,6 @@
           "npm:@ts-morph/bootstrap@0.22",
           "npm:code-block-writer@^13.0.1"
         ]
-      },
-      "@deno/graph@0.69.10": {
-        "integrity": "38fe22ac5686f6ece5daeec5a4df65c6314d7d32adcc33f77917a13cfaffa26f"
       },
       "@std/assert@0.218.2": {
         "integrity": "7f0a5a1a8cf86607cd6c2c030584096e1ffad27fc9271429a8cb48cfbdee5eaf"
@@ -1636,11 +1630,5 @@
     "https://deno.land/std@0.224.0/internal/format.ts": "0a98ee226fd3d43450245b1844b47003419d34d210fa989900861c79820d21c2",
     "https://deno.land/std@0.224.0/internal/mod.ts": "534125398c8e7426183e12dc255bb635d94e06d0f93c60a297723abe69d3b22e",
     "https://raw.githubusercontent.com/denolib/ms/d9e99a2fa10a9dc8d4cd97b8de1be10c57bf6e77/ms.ts": "13014fdf12808df48f6e557cc3be22d24db5b8e29b687d710f9012df3428d2c8"
-  },
-  "workspace": {
-    "dependencies": [
-      "jsr:@deno/dnt@^0.41.1",
-      "jsr:@std/assert@^0.225.3"
-    ]
   }
 }

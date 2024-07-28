@@ -1,19 +1,20 @@
 import { Fns, FNS_SIGNATURE_HEADER } from "./index.ts";
 import type { VercelRequest, VercelResponse } from "npm:@vercel/node";
-import type { Readable } from "node:stream";
+//import type { Readable } from "node:stream";
 
 export const config = {
   api: {
     bodyParser: false,
   },
 };
+/*
 async function readableToString2(readable: Readable) {
   let result = "";
   for await (const chunk of readable) {
     result += chunk;
   }
   return result;
-}
+}*/
 
 export const serve = (client: Fns) => {
   return async (req: VercelRequest, res: VercelResponse) => {
@@ -26,9 +27,9 @@ export const serve = (client: Fns) => {
       );
       const result = await client.onHandler(event, abortController.signal);
       return res.json(result);
-    } catch (err: any) {
-      console.log(`Webhook Error: ${err.message}`);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+    } catch (e) {
+      console.log(`Webhook Error: ${e.message}`);
+      return res.status(400).send(`Webhook Error: ${e.message}`);
     }
   };
 };

@@ -40,5 +40,5 @@ with any framework and platform.
 The Fns SDK and its integrations are licensed under the **Apache-2 License**.
 
 The full text of the license can be accessed via
-[this link](https://opensource.org/license/apache-2-0) and is also included in the
-[LICENSE.md](LICENSE.md) file of this software package.
+[this link](https://opensource.org/license/apache-2-0) and is also included in
+the [LICENSE.md](LICENSE.md) file of this software package.

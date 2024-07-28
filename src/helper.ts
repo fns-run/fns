@@ -1,6 +1,8 @@
 export const resolveNextTick = (timeouts: number[]) =>
-  new Promise((resolve) => timeouts.push(setTimeout(resolve, 0)));
-export const execute = async (fn: any) => {
+  new Promise((resolve) => timeouts.push(Number(setTimeout(resolve, 0))));
+export async function execute(
+  fn: Promise<unknown>,
+): Promise<[boolean, unknown]> {
   const timeouts: number[] = [];
   function clear() {
     for (let i = 0; i < timeouts.length; i++) {
@@ -9,16 +11,18 @@ export const execute = async (fn: any) => {
   }
   try {
     const result = await Promise.race([
-      fn.then((data: any) => [true, data]),
+      fn.then((data: unknown) => [true, data]),
       resolveNextTick(timeouts).then(() => [false, null]),
-    ]);
+    ]) as [boolean, unknown];
     clear();
     return result;
   } catch (err) {
     clear();
     throw err;
   }
-};
-export const block = () => new Promise(() => {}) as Promise<any>;
+}
+export function block<T = unknown>(): Promise<T> {
+  return new Promise(() => {});
+}
 
 export default { resolveNextTick, execute, block };
