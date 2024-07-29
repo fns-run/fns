@@ -1,4 +1,10 @@
 # Table of contents
 
-* [Page](README.md)
-* [Page 1](page-1.md)
+## GETTING STARTED
+
+* [Quick Start](README.md)
+
+## Fns Basics
+
+* [First Steps](fns-basics/first-steps.md)
+* [Web Frameworks](fns-basics/web-frameworks.md)
