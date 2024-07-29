@@ -1,5 +1,5 @@
 import { verify } from "./signature.ts";
-import { ms } from "../deps.ts";
+import { assert, assertExists, ms } from "../deps.ts";
 import {
   FnsFunction,
   FnsRemoteFunction,
@@ -148,7 +148,7 @@ export class Fns {
     if (abortSignal.aborted) throw new Error("Aborted");
     let init = false;
     let pc = 0;
-    const steps = event.steps; // before [...event.steps]
+    const steps = event.steps;
     const state: Record<string, unknown> = event.state ?? {};
     const stateChanges = new Set<string>();
     const mutations: Mutation[] = [];
@@ -162,9 +162,11 @@ export class Fns {
       while (steps.at(pc)?.type === "signal") {
         const next = steps[pc++];
         if (!next) return;
-        const { signal } = next.params as { signal: string };
-        const cb = signals.get(signal);
-        if (!cb) throw new NonRetriableError(`Signal ${signal} not found`);
+        assertExists(next.params, "params is required");
+        const params = next.params as { signal: string };
+        assertExists(params.signal, "signal is required");
+        const cb = signals.get(params.signal);
+        assertExists(cb, `Signal ${params.signal} not found`);
         cb(next.result);
       }
     }
@@ -176,19 +178,25 @@ export class Fns {
         () => {},
       complete: (res: unknown) => void = () => {},
     ): Promise<T> {
-      if (!init) throw new NonRetriableError("must be initialized");
+      assertExists(id, "id is required");
+      assertExists(type, "type is required");
+      assertExists(write, "write callback is required");
+      assertExists(complete, "complete callback is required");
+      assert(
+        params === null || params instanceof Object,
+        "params must be null or an object",
+      );
+      assert(write instanceof Function, "write must be a function");
+      assert(complete instanceof Function, "complete must be a function");
+      assert(init, "memo must be called at initialization");
       const step = steps[pc++];
       unrollSignals();
       if (!step) { // initialize
         mutations.push({ id, type, params, completed: false });
         return await block<T>();
       }
-      if (step.id !== id) {
-        throw new NonRetriableError(
-          `Invalid step id ${step.id} expected ${id}`,
-        );
-      }
-      if (step.completed) { // completed
+      assert(step.id === id, `Invalid step id ${step.id} expected ${id}`);
+      if (step.completed) {
         complete(step.result);
         return step.result as T;
       }
@@ -209,17 +217,32 @@ export class Fns {
       id: string,
       cb: () => T | Promise<T>,
     ): Promise<T> {
+      assertExists(id, "id is required");
+      assertExists(cb, "cb is required");
+      assert(typeof cb === "function", "cb must be a function");
       return await memo<T>(id, "run", null, async (done) => {
         const res = await Promise.resolve(cb());
         done(res);
       });
     }
     async function sleep(id: string, timeout: string | number): Promise<void> {
+      assertExists(id, "id is required");
+      assertExists(timeout, "timeout is required");
+      assert(
+        typeof timeout === "string" || typeof timeout === "number",
+        "timeout must be a string or number",
+      );
       return await memo<void>(id, "sleep", {
         timeout: typeof timeout === "string" ? ms(timeout) as number : timeout,
       }, () => {});
     }
     async function sleepUntil(id: string, until: Date | string): Promise<void> {
+      assertExists(id, "id is required");
+      assertExists(until, "until is required");
+      assert(
+        (until as unknown) instanceof Date || typeof until === "string",
+        "until must be a string or date",
+      );
       return await memo<void>(id, "sleep", {
         until: typeof until === "string" ? until : until.toISOString(),
       }, () => {});
@@ -229,6 +252,14 @@ export class Fns {
       cb: () => boolean,
       timeout?: string | number,
     ): Promise<boolean> {
+      assertExists(id, "id is required");
+      assertExists(cb, "cb is required");
+      assert(typeof cb === "function", "cb must be a function");
+      assert(
+        typeof timeout === "string" || typeof timeout === "number" ||
+          timeout === undefined,
+        "timeout must be a string, number or undefined",
+      );
       return await memo<boolean>(
         id,
         "condition",
@@ -247,6 +278,15 @@ export class Fns {
       keys: string[],
       timeout?: string | number,
     ): Promise<boolean> {
+      assertExists(id, "id is required");
+      assertExists(keys, "keys is required");
+      assert(keys instanceof Array, "keys must be an array");
+      assert(keys.length > 0, "keys must not be empty");
+      assert(
+        typeof timeout === "string" || typeof timeout === "number" ||
+          timeout === undefined,
+        "timeout must be a string, number or undefined",
+      );
       return await memo<boolean>(
         id,
         "lock",
@@ -267,6 +307,11 @@ export class Fns {
       );
     }
     async function unlock(id: string, keys?: string[]): Promise<void> {
+      assertExists(id, "id is required");
+      assert(
+        keys === undefined || (keys instanceof Array && keys.length > 0),
+        "keys must be an array not empty or undefined",
+      );
       const cb = () => {
         if (!keys) {
           mutexes.clear();
@@ -293,11 +338,9 @@ export class Fns {
           | ((prevState: typeof initial) => typeof initial),
       ) => void,
     ] {
-      if (init) {
-        throw new NonRetriableError(
-          "useState must be called at initialization",
-        );
-      }
+      assertExists(id, "id is required");
+      assert(typeof id === "string", "id must be a string");
+      assert(!init, "useState must be called at initialization");
       if (!(id in state)) {
         state[id] = initial;
         stateChanges.add(id);
@@ -318,42 +361,36 @@ export class Fns {
       GetState.id = id;
       return [GetState, SetState];
     }
-    function useSignal<T = unknown>(signal: string, cb?: (data: T) => void) {
-      if (init) {
-        throw new NonRetriableError(
-          "useSignal must be called at initialization",
-        );
-      }
-      if (signals.has(signal)) {
-        throw new NonRetriableError(`Signal ${signal} already in use`);
-      }
-      //const [signalValue, setSignalState] = useState<T>();
-      signals.set(signal, (value) => {
-        //setSignalState(value);
-        cb?.(value as T);
-      });
-      //if (signalValue() !== undefined) cb?.(signalValue()!);
-      //return signalValue;
+    function useSignal<T = unknown>(signal: string, cb: (data: T) => void) {
+      assertExists(signal, "signal is required");
+      assertExists(cb, "cb is required");
+      assert(typeof signal === "string", "signal must be a string");
+      assert(typeof cb === "function", "cb must be a function");
+      assert(!init, "useSignal must be called at initialization");
+      assert(!signals.has(signal), `Signal ${signal} already in use`);
+      signals.set(signal, (value) => cb?.(value as T));
     }
     function useQuery<T = unknown>(
       query: string,
       cb: () => T,
       dependencies: StateGetter[] = [],
     ) {
-      if (init) {
-        throw new NonRetriableError(
-          "useQuery must be called at initialization",
-        );
-      }
-      if (!queries.find((q) => q.name === query)) {
-        queries.push({
-          name: query,
-          cb,
-          dependencies: dependencies.map((dep) => dep.id),
-        });
-        return;
-      }
-      throw new NonRetriableError(`Query ${query} already in use`);
+      assertExists(query, "query is required");
+      assertExists(cb, "cb is required");
+      assertExists(dependencies, "dependencies is required");
+      assert(typeof query === "string", "query must be a string");
+      assert(typeof cb === "function", "cb must be a function");
+      assert(dependencies instanceof Array, "dependencies must be an array");
+      assert(!init, "useQuery must be called at initialization");
+      assert(
+        !queries.find((q) => q.name === query),
+        `Query ${query} already in use`,
+      );
+      queries.push({
+        name: query,
+        cb,
+        dependencies: dependencies.map((dep) => dep.id),
+      });
     }
     function useFunctions(_names: string[]): Record<string, FnsRemoteFunction> {
       throw new NonRetriableError("useFunctions not implemented");
@@ -408,9 +445,8 @@ export class Fns {
       */
     }
     const bootstrap = await fn({ useSignal, useQuery, useState, useFunctions });
-    if (typeof bootstrap !== "function") {
-      throw new NonRetriableError("must return a function");
-    }
+    assertExists(bootstrap, "must return a function");
+    assert(typeof bootstrap === "function", "must return a function");
     unrollSignals();
     init = true;
     let isCompleted, result;
@@ -509,6 +545,7 @@ export class Fns {
     const funcs: Set<string> = new Set();
 
     try {
+      // fake interface to collect all informations
       const output = fn({
         useQuery(name) {
           queries.add(name);
@@ -527,9 +564,8 @@ export class Fns {
           return {};
         },
       });
-      if (typeof output !== "function") {
-        throw new Error("Function must return a function");
-      }
+      assertExists(output, "must return a function");
+      assert(typeof output === "function", "must return a function");
     } catch (e) {
       throw new Error(
         `Failed to create function ${name}:${version} with message: ${e.message}`,

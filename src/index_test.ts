@@ -1,5 +1,5 @@
 // url_test.ts
-import { assert, assertEquals } from "jsr:@std/assert@^0.225.3";
+import { assert, assertEquals } from "../deps.ts";
 import { Fns } from "./index.ts";
 import { FnsRequestParams } from "./types.ts";
 
