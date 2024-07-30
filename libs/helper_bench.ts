@@ -1,4 +1,4 @@
-import { resolveNextTick, execute, block } from "./helper.ts"; // Adjust the path according to your file structure
+import { block, execute, resolveNextTick } from "./helper.ts"; // Adjust the path according to your file structure
 
 // Define a promise that resolves immediately
 const resolvedPromise = Promise.resolve("immediate");

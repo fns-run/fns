@@ -13,18 +13,18 @@ const testCases = {
     "12345 ms",
   ],
   format: [
-    1000,       // 1 second
-    60000,      // 1 minute
-    3600000,    // 1 hour
-    86400000,   // 1 day
-    604800000,  // 1 week
-    31536000000 // 1 year
+    1000, // 1 second
+    60000, // 1 minute
+    3600000, // 1 hour
+    86400000, // 1 day
+    604800000, // 1 week
+    31536000000, // 1 year
   ],
 };
 
 // Benchmark the `ms` function for parsing strings
 Deno.bench("ms - parse", () => {
-  for(let i=0; i < testCases.parse.length; i++) {
+  for (let i = 0; i < testCases.parse.length; i++) {
     const str = testCases.parse[i];
     ms(str);
   }
@@ -32,7 +32,7 @@ Deno.bench("ms - parse", () => {
 
 // Benchmark the `ms` function for formatting numbers in short format
 Deno.bench("ms - format short", () => {
-  for(let i=0; i < testCases.format.length; i++) {
+  for (let i = 0; i < testCases.format.length; i++) {
     const num = testCases.format[i];
     ms(num, { long: false });
   }
@@ -40,7 +40,7 @@ Deno.bench("ms - format short", () => {
 
 // Benchmark the `ms` function for formatting numbers in long format
 Deno.bench("ms - format long", () => {
-  for(let i=0; i < testCases.format.length; i++) {
+  for (let i = 0; i < testCases.format.length; i++) {
     const num = testCases.format[i];
     ms(num, { long: true });
   }
