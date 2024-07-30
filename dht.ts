@@ -11,9 +11,9 @@ await build({
   },
   package: {
     // package.json properties
-    name: "fns",
+    name: "@fns-run/fns",
     version: Deno.args[0],
-    description: "Fns is a function as a service runtime",
+    description: "Make your serverless functions invincible",
     license: "Apache-2",
     repository: {
       type: "git",
