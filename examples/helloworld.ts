@@ -2,7 +2,7 @@ import { Fns } from "../libs/index.ts";
 import { serve } from "../libs/express.ts";
 import express from "npm:express";
 
-const fns = new Fns({ dev: true, token: "helloworld" });
+const fns = new Fns({ dev: true });
 fns.createFunction(
   { name: "WorkflowTest", version: 1 },
   () => {
