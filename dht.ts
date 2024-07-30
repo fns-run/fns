@@ -1,5 +1,4 @@
-// ex. scripts/build_npm.ts
-import { build, emptyDir } from "./deps.ts";
+import { build, emptyDir } from "jsr:@deno/dnt@^0.41.1";
 
 await emptyDir("./npm");
 

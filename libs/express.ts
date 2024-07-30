@@ -1,3 +1,4 @@
+// @deno-types=npm:@types/express
 import { type Fns, FNS_SIGNATURE_HEADER } from "./index.ts";
 import type { Request, Response } from "npm:express@4.19.2";
 
