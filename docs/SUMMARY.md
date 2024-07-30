@@ -11,3 +11,12 @@
 * [Smart Locks](basics/smart-locks.md)
 * [Auto Snapshot](basics/auto-snapshot.md)
 * [Frameworks](basics/frameworks.md)
+
+## Advanced Use Cases
+
+* [Subscription Billing](advanced-use-cases/subscription-billing.md)
+* [Ride Hailing](advanced-use-cases/ride-hailing.md)
+* [Food Delivery](advanced-use-cases/food-delivery.md)
+* [AI Agent](advanced-use-cases/ai-agent.md)
+* [Recommendations](advanced-use-cases/recommendations.md)
+* [MMO Inventory](advanced-use-cases/mmo-inventory.md)
