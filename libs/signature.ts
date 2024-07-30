@@ -5,7 +5,9 @@ export const sign = async (
   secret: string,
   timestamp: number = Date.now(),
 ) => {
-  const cryptoLib = globalThis.crypto ? globalThis.crypto : await import("node:crypto");
+  const cryptoLib = globalThis.crypto
+    ? globalThis.crypto
+    : await import("node:crypto");
   const signature = await cryptoLib.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(secret + input + timestamp),
@@ -19,7 +21,9 @@ export const verify = async (
   signature: string,
   opts: { timeout?: number; timestamp?: number } = {},
 ) => {
-  const cryptoLib = globalThis.crypto ? globalThis.crypto : await import("node:crypto");
+  const cryptoLib = globalThis.crypto
+    ? globalThis.crypto
+    : await import("node:crypto");
   if (!signature) return false;
   const match = signature.split(",", 2);
   if (match.length !== 2) return false;
