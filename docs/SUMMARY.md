@@ -3,6 +3,7 @@
 ## GETTING STARTED
 
 * [Quick Start](README.md)
+* [Frameworks](getting-started/frameworks.md)
 
 ## Basics
 
@@ -10,7 +11,6 @@
 * [Signals & Queries](basics/signals-and-queries.md)
 * [Smart Locks](basics/smart-locks.md)
 * [Auto Snapshot](basics/auto-snapshot.md)
-* [Frameworks](basics/frameworks.md)
 
 ## Advanced Use Cases
 
