@@ -1,5 +1,5 @@
 // Import the necessary functions from Deno's standard library
-import { assertEquals, assertFalse } from "../deps.ts";
+import { assertEquals, assertFalse } from "@std/assert";
 
 // Import the functions to be tested
 import { sign, verify } from "./signature.ts"; // Adjust the import path as needed

@@ -1,18 +1,17 @@
-import { assert, assertExists } from "../deps.ts";
+import { assert, assertExists } from "@std/assert";
 import { ms } from "./ms.ts";
 import { verify } from "./signature.ts";
-import {
-  type FnsFunction,
-  type FnsRemoteFunction,
-  type FnsRequestParams,
-  type FnsResponse,
-  type Mutation,
-  type Params,
-  type Query,
-  type Schema,
-  type StateGetter,
-  type StepType,
-  zFnsRequestParams,
+import type {
+  FnsFunction,
+  FnsRemoteFunction,
+  FnsRequestParams,
+  FnsResponse,
+  Mutation,
+  Params,
+  Query,
+  Schema,
+  StateGetter,
+  StepType,
 } from "./types.ts";
 import { block, execute } from "./helper.ts";
 import { xxHash32 } from "./xxhash32.ts";
@@ -127,9 +126,7 @@ export class Fns {
     body: string,
     signature: string,
   ): Promise<FnsRequestParams> {
-    const event: FnsRequestParams = await zFnsRequestParams.parseAsync(
-      JSON.parse(body),
-    ) as FnsRequestParams;
+    const event: FnsRequestParams = JSON.parse(body) as FnsRequestParams;
     if (this._options.dev) return event;
     if (!this._options.token) throw new Error("A valid token is required");
     const isVerified = await verify(body, this._options.token, signature);
