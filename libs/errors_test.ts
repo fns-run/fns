@@ -23,5 +23,8 @@ Deno.test("NonRetriableError: Should have correct prototype chain", () => {
 
   // Check if the prototype chain is correctly set up
   assertEquals(Object.getPrototypeOf(error), NonRetriableError.prototype);
-  assertEquals(Object.getPrototypeOf(NonRetriableError.prototype), Error.prototype);
+  assertEquals(
+    Object.getPrototypeOf(NonRetriableError.prototype),
+    Error.prototype,
+  );
 });

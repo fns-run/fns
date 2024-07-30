@@ -127,7 +127,9 @@ export class Fns {
     body: string,
     signature: string,
   ): Promise<FnsRequestParams> {
-    const event: FnsRequestParams = await zFnsRequestParams.parseAsync(JSON.parse(body)) as FnsRequestParams;
+    const event: FnsRequestParams = await zFnsRequestParams.parseAsync(
+      JSON.parse(body),
+    ) as FnsRequestParams;
     if (this._options.dev) return event;
     if (!this._options.token) throw new Error("A valid token is required");
     const isVerified = await verify(body, this._options.token, signature);
