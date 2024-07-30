@@ -7,12 +7,6 @@ export type Callback<T = unknown> = () => T;
 export interface StateGetter<T = unknown> extends Callback<T> {
   id: string;
 }
-export class NonRetriableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NonRetriableError";
-  }
-}
 export interface FnsQueryValue<T> {
   value: T;
   timestamp: string;

@@ -1,5 +1,5 @@
-import { Fns } from "../src/index.ts";
-import { serve } from "../src/express.ts";
+import { Fns } from "../libs/index.ts";
+import { serve } from "../libs/express.ts";
 import express from "npm:express";
 
 const fns = new Fns({ dev: true, token: "helloworld" });

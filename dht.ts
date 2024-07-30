@@ -1,5 +1,5 @@
 // ex. scripts/build_npm.ts
-import { build, emptyDir } from "jsr:@deno/dnt@^0.41.1";
+import { build, emptyDir } from "./deps.ts";
 
 await emptyDir("./npm");
 
@@ -15,13 +15,13 @@ await build({
     name: "fns",
     version: Deno.args[0],
     description: "Fns is a function as a service runtime",
-    license: "MIT",
+    license: "Apache-2",
     repository: {
       type: "git",
-      url: "git+https://github.com/username/repo.git",
+      url: "git+https://github.com/fns-run/fns.git",
     },
     bugs: {
-      url: "https://github.com/username/repo/issues",
+      url: "https://github.com/fns-run/fns/issues",
     },
   },
   postBuild() {

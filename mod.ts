@@ -1,3 +1,3 @@
-export { default as Fns } from "./src/index.ts";
-export { default as express } from "./src/express.ts";
-export { default as vercel } from "./src/vercel.ts";
+export { default as Fns } from "./libs/index.ts";
+export { default as express } from "./libs/express.ts";
+export { default as vercel } from "./libs/vercel.ts";

@@ -1,7 +1,9 @@
-import { Fns, FNS_SIGNATURE_HEADER } from "./index.ts";
-import type { Request, Response } from "npm:express";
+import { type Fns, FNS_SIGNATURE_HEADER } from "./index.ts";
+import type { Request, Response } from "npm:express@4.19.2";
 
-export const serve = (client: Fns) => {
+export function serve(
+  client: Fns,
+): (req: Request, res: Response) => Promise<unknown> {
   return async (req: Request, res: Response) => {
     if (req.method === "GET") return res.json(client.getConfig());
     const abortController = new AbortController();
@@ -17,5 +19,6 @@ export const serve = (client: Fns) => {
       return res.status(400).send(`Internal Server Error: ${e.message}`);
     }
   };
-};
+}
+
 export default { serve };

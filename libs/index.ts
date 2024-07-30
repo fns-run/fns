@@ -1,12 +1,12 @@
+import { assert, assertExists } from "../deps.ts";
+import { ms } from "./ms.ts";
 import { verify } from "./signature.ts";
-import { assert, assertExists, ms } from "../deps.ts";
-import {
+import type {
   FnsFunction,
   FnsRemoteFunction,
   FnsRequestParams,
   FnsResponse,
   Mutation,
-  NonRetriableError,
   Params,
   Query,
   Schema,
@@ -15,8 +15,14 @@ import {
 } from "./types.ts";
 import { block, execute } from "./helper.ts";
 import { xxHash32 } from "./xxhash32.ts";
+import { NonRetriableError } from "./errors.ts";
 
 export const FNS_SIGNATURE_HEADER = "x-fns-signature";
+
+interface FnsExternalConfig {
+  checksum: number;
+  definitions: Definition[];
+}
 interface StartExecutionArgs {
   id: string;
   name: string;
@@ -32,13 +38,6 @@ interface QueryExecutionArgs {
   id: string;
   query: string;
 }
-interface StartExecutionResponse {
-  ok: boolean;
-}
-interface SignalExecutionResponse {
-  ok: boolean;
-  signal: { id: string };
-}
 
 export interface FnsOptions {
   dev?: boolean;
@@ -46,18 +45,18 @@ export interface FnsOptions {
   token?: string;
   apiKey?: string;
 }
-interface FnsDefinition {
+interface Definition {
   name: string;
   fn: FnsFunction;
   version: number;
   states: Record<string, unknown>;
-  funcs: string[];
+  remotes: string[];
   queries: string[];
   signals: string[];
   schema: Schema;
 }
 export class Fns {
-  private _definitions: FnsDefinition[];
+  private _definitions: Definition[];
   private _options: FnsOptions;
   private _ver: number;
   constructor(options: FnsOptions) {
@@ -96,39 +95,38 @@ export class Fns {
     if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`);
     return await res.json() as T;
   }
-  async invoke(args: StartExecutionArgs) {
-    const res = await this.POST<StartExecutionResponse>(
+  async invoke(args: StartExecutionArgs): Promise<string> {
+    const res = await this.POST<string>(
       "/executions/create",
       args,
     );
     return res;
   }
-  async result<T>(id: string) {
+  async result<T>(id: string): Promise<T> {
     const res = await this.GET<T>(`/executions/${id}/result`);
     return res;
   }
-  async trigger(args: TriggerExecutionArgs) {
-    const res = await this.POST<SignalExecutionResponse>(
+  async trigger(args: TriggerExecutionArgs): Promise<void> {
+    await this.POST<void>(
       `/executions/${args.id}/trigger`,
       { signal: args.signal, data: args.data },
       args.idempotencyKey
         ? { "x-fns-idempotency-key": args.idempotencyKey }
         : {},
     );
-    return res;
   }
-  async query<T>(args: QueryExecutionArgs) {
+  async query<T>(args: QueryExecutionArgs): Promise<T> {
     const res = await this.GET<T>(`/executions/${args.id}/query/${args.query}`);
     return res;
   }
-  constructEvent(body: string, signature: string) {
+  constructEvent(body: string, signature: string): FnsRequestParams {
     if (!this._options.dev) {
       if (!this._options.token) throw new Error("Token is required");
       if (!verify(body, this._options.token, signature)) {
         throw new Error("Invalid signature");
       }
     }
-    const event = JSON.parse(body);
+    const event = JSON.parse(body) as FnsRequestParams;
     return event;
   }
   async onHandler(
@@ -147,7 +145,7 @@ export class Fns {
   ): Promise<FnsResponse> {
     if (abortSignal.aborted) throw new Error("Aborted");
     let init = false;
-    let pc = 0;
+    let tick = 0;
     const steps = event.steps;
     const state: Record<string, unknown> = event.state ?? {};
     const stateChanges = new Set<string>();
@@ -158,9 +156,8 @@ export class Fns {
     const mutexes = new Set<string>();
 
     function unrollSignals() {
-      if (steps.length === 0) return;
-      while (steps.at(pc)?.type === "signal") {
-        const next = steps[pc++];
+      while (steps[tick]?.type === "signal") {
+        const next = steps[tick++];
         if (!next) return;
         assertExists(next.params, "params is required");
         const params = next.params as { signal: string };
@@ -189,7 +186,7 @@ export class Fns {
       assert(write instanceof Function, "write must be a function");
       assert(complete instanceof Function, "complete must be a function");
       assert(init, "memo must be called at initialization");
-      const step = steps[pc++];
+      const step = steps[tick++];
       unrollSignals();
       if (!step) { // initialize
         mutations.push({ id, type, params, completed: false });
@@ -201,15 +198,13 @@ export class Fns {
         return step.result as T;
       }
       const start = performance.now();
-      await Promise.resolve(
-        write((result) =>
-          mutations.push({
-            id,
-            result,
-            elapsed: Math.round(performance.now() - start),
-            completed: true,
-          })
-        ),
+      await write((result) =>
+        mutations.push({
+          id,
+          result,
+          elapsed: Math.round(performance.now() - start),
+          completed: true,
+        })
       );
       return await block<T>();
     }
@@ -232,9 +227,10 @@ export class Fns {
         typeof timeout === "string" || typeof timeout === "number",
         "timeout must be a string or number",
       );
-      return await memo<void>(id, "sleep", {
+      const params: Params = {
         timeout: typeof timeout === "string" ? ms(timeout) as number : timeout,
-      }, () => {});
+      };
+      return await memo<void>(id, "sleep", params, () => {});
     }
     async function sleepUntil(id: string, until: Date | string): Promise<void> {
       assertExists(id, "id is required");
@@ -243,9 +239,10 @@ export class Fns {
         (until as unknown) instanceof Date || typeof until === "string",
         "until must be a string or date",
       );
-      return await memo<void>(id, "sleep", {
+      const params: Params = {
         until: typeof until === "string" ? until : until.toISOString(),
-      }, () => {});
+      };
+      return await memo<void>(id, "sleep", params, () => {});
     }
     async function condition(
       id: string,
@@ -260,16 +257,17 @@ export class Fns {
           timeout === undefined,
         "timeout must be a string, number or undefined",
       );
+      const params: Params = timeout
+        ? {
+          timeout: typeof timeout === "string"
+            ? ms(timeout) as number
+            : timeout,
+        }
+        : null;
       return await memo<boolean>(
         id,
         "condition",
-        timeout
-          ? {
-            timeout: typeof timeout === "string"
-              ? ms(timeout) as number
-              : timeout,
-          }
-          : null,
+        params,
         (done) => cb() && done(true),
       );
     }
@@ -287,15 +285,16 @@ export class Fns {
           timeout === undefined,
         "timeout must be a string, number or undefined",
       );
+      const params: Params = {
+        keys,
+        ...timeout
+          ? { timeout: typeof timeout === "string" ? ms(timeout) : timeout }
+          : {},
+      };
       return await memo<boolean>(
         id,
         "lock",
-        {
-          keys,
-          ...timeout
-            ? { timeout: typeof timeout === "string" ? ms(timeout) : timeout }
-            : {},
-        },
+        params,
         () => {},
         (res) => {
           if (res) {
@@ -319,10 +318,11 @@ export class Fns {
         }
         for (let i = 0; i < keys.length; i++) mutexes.delete(keys[i]);
       };
+      const params: Params = keys ? { keys } : null;
       return await memo<void>(
         id,
         "unlock",
-        keys ? { keys } : null,
+        params,
         () => {},
         cb,
       );
@@ -470,17 +470,17 @@ export class Fns {
           },
         },
         logger: {
-          info(...args: unknown[]) {
-            console.log(...args);
+          info(..._args: unknown[]) {
+            throw new Error("Function not implemented.");
           },
-          warn(...args: unknown[]) {
-            console.warn(...args);
+          warn(..._args: unknown[]) {
+            throw new Error("Function not implemented.");
           },
-          error(...args: unknown[]) {
-            console.error(...args);
+          error(..._args: unknown[]) {
+            throw new Error("Function not implemented.");
           },
-          debug(...args: unknown[]) {
-            console.debug(...args);
+          debug(..._args: unknown[]) {
+            throw new Error("Function not implemented.");
           },
         },
       }));
@@ -525,7 +525,7 @@ export class Fns {
       ...Object.keys(applyQueries).length > 0 ? { queries: applyQueries } : {},
     };
   }
-  public getConfig() {
+  public getConfig(): FnsExternalConfig {
     return {
       checksum: this._ver,
       definitions: this._definitions,
@@ -538,11 +538,11 @@ export class Fns {
       schema?: Schema;
     },
     fn: FnsFunction,
-  ) {
+  ): void {
     const states: Record<string, unknown> = {};
     const queries: Set<string> = new Set();
     const signals: Set<string> = new Set();
-    const funcs: Set<string> = new Set();
+    const remotes: Set<string> = new Set();
 
     try {
       // fake interface to collect all informations
@@ -559,7 +559,7 @@ export class Fns {
         },
         useFunctions(names: string[]) {
           for (let i = 0; i < names.length; i++) {
-            funcs.add(names[i]);
+            remotes.add(names[i]);
           }
           return {};
         },
@@ -576,7 +576,7 @@ export class Fns {
       version,
       fn,
       states,
-      funcs: Array.from(funcs),
+      remotes: Array.from(remotes),
       queries: Array.from(queries),
       signals: Array.from(signals),
       schema: schema ?? {},

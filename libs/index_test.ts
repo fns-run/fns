@@ -1,7 +1,7 @@
 // url_test.ts
 import { assert, assertEquals } from "../deps.ts";
 import { Fns } from "./index.ts";
-import { FnsRequestParams } from "./types.ts";
+import type { FnsRequestParams } from "./types.ts";
 
 function buildInstance(name: string, data?: unknown): FnsRequestParams {
   return {

@@ -1,5 +1,5 @@
-import { Fns, FNS_SIGNATURE_HEADER } from "./index.ts";
-import type { VercelRequest, VercelResponse } from "npm:@vercel/node";
+import { type Fns, FNS_SIGNATURE_HEADER } from "./index.ts";
+import type { VercelRequest, VercelResponse } from "npm:@vercel/node@3.1.5";
 //import type { Readable } from "node:stream";
 
 export const config = {
@@ -16,7 +16,9 @@ async function readableToString2(readable: Readable) {
   return result;
 }*/
 
-export const serve = (client: Fns) => {
+export function serve(
+  client: Fns,
+): (req: VercelRequest, res: VercelResponse) => Promise<unknown> {
   return async (req: VercelRequest, res: VercelResponse) => {
     if (req.method === "GET") return res.json(client.getConfig());
     const abortController = new AbortController();
@@ -32,6 +34,6 @@ export const serve = (client: Fns) => {
       return res.status(400).send(`Webhook Error: ${e.message}`);
     }
   };
-};
+}
 
 export default { serve };
