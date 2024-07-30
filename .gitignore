@@ -133,3 +133,9 @@ dist
 
 coverage/
 npm/
+.idea
+.vim
+**/cov/
+deno.lock
+html_cov/
+cov.lcov

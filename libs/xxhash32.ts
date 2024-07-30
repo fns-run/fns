@@ -1,9 +1,11 @@
+import { assert } from "../deps.ts";
+
 const PRIME32_1 = 2654435761;
 const PRIME32_2 = 2246822519;
 const PRIME32_3 = 3266489917;
 const PRIME32_4 = 668265263;
 const PRIME32_5 = 374761393;
-function toUtf8(text: string): Uint8Array {
+export function toUtf8(text: string): Uint8Array {
   const bytes: number[] = [];
   for (let i = 0, n = text.length; i < n; ++i) {
     const c = text.charCodeAt(i);
@@ -31,6 +33,14 @@ function toUtf8(text: string): Uint8Array {
  * @param seed - optional seed (32-bit unsigned);
  */
 export function xxHash32(buffer: Uint8Array | string, seed = 0): number {
+  assert(
+    seed >= 0 && seed <= 0xffffffff,
+    "seed must be a 32-bit unsigned integer",
+  );
+  assert(
+    typeof buffer === "string" || buffer instanceof Uint8Array,
+    "buffer must be a string or Uint8Array",
+  );
   buffer = typeof buffer === "string" ? toUtf8(buffer) : buffer;
   const b = buffer;
 

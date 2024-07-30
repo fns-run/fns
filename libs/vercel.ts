@@ -23,7 +23,7 @@ export function serve(
     if (req.method === "GET") return res.json(client.getConfig());
     const abortController = new AbortController();
     try {
-      const event = client.constructEvent(
+      const event = await client.constructEvent(
         req.body.toString("utf8"),
         req.headers[FNS_SIGNATURE_HEADER] as string,
       );

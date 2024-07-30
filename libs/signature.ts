@@ -24,9 +24,9 @@ export const verify = async (
   const match = signature.split(",", 2);
   if (match.length !== 2) return false;
 
-  const poststamp = Number(match[1]);
+  const poststamp = Number(match[0]);
   if (isNaN(poststamp)) return false;
-  const postDigest = match[2];
+  const postDigest = match[1];
 
   const timestamp = opts?.timestamp ?? Date.now();
   const timeout = opts?.timeout ?? SECONDS30;

@@ -1,7 +1,10 @@
 // url_test.ts
-import { assert, assertEquals } from "../deps.ts";
-import { Fns } from "./index.ts";
+import { assert, assertEquals, assertRejects } from "../deps.ts";
+import { Fns, setPerformanceCounter } from "./index.ts";
+import { sign } from "./signature.ts";
 import type { FnsRequestParams } from "./types.ts";
+
+setPerformanceCounter(() => 0);
 
 function buildInstance(name: string, data?: unknown): FnsRequestParams {
   return {
@@ -14,42 +17,24 @@ function buildInstance(name: string, data?: unknown): FnsRequestParams {
     snapshot: false,
   };
 }
-
-const fns = new Fns({ dev: false, token: "test" });
-
-fns.createFunction(
-  { name: "DefineFirstNameAndLastName", version: 1 },
-  () => async ({ step, ctx }) => {
-    const data = ctx.data as { prefix: string };
-    assert(data.prefix, "prefix is required");
-    const firstName = await step.run("define-firstname", () => {
-      return "lucas";
-    });
-    await step.sleep("wait-10s", "10s");
-    const lastName = await step.run("define-lastname", () => {
-      return "fernandes";
-    });
-    return `Hello ${data.prefix} ${firstName} ${lastName}`;
-  },
-);
-
-fns.createFunction(
-  { name: "LockerToUnlock", version: 1 },
-  ({ useSignal }) => {
-    let locked: boolean = true;
-    useSignal("unlock", () => locked = false);
-    return async ({ step, ctx }) => {
-      const data = ctx.data as { isLocked: boolean };
-      if (data && data.isLocked !== undefined) {
-        locked = data.isLocked;
-      }
-      await step.condition("wait-unlock", () => locked === false);
-      return "unlocked";
-    };
-  },
-);
-
 Deno.test("DefineFirstNameAndLastName", async (t) => {
+  const fns = new Fns({ dev: true });
+  fns.createFunction(
+    { name: "DefineFirstNameAndLastName", version: 1 },
+    () => async ({ step, ctx }) => {
+      const data = ctx.data as { prefix: string };
+      assert(data.prefix, "prefix is required");
+      const firstName = await step.run("define-firstname", () => {
+        return "lucas";
+      });
+      await step.sleep("wait-10s", "10s");
+      const lastName = await step.run("define-lastname", () => {
+        return "fernandes";
+      });
+      return `Hello ${data.prefix} ${firstName} ${lastName}`;
+    },
+  );
+
   const initial = buildInstance("DefineFirstNameAndLastName", { prefix: "Mr" });
   const abortSignal = new AbortController().signal;
   await t.step("init define-firstname", async () => {
@@ -212,6 +197,23 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
   });
 });
 Deno.test("LockerToUnlock", async (t) => {
+  const fns = new Fns({ dev: true });
+  fns.createFunction(
+    { name: "LockerToUnlock", version: 1 },
+    ({ useSignal, useQuery, useState }) => {
+      const [locked, setLocked] = useState<boolean>("isLocked", true);
+      useSignal("unlock", () => setLocked(false));
+      useQuery("isLocked", () => locked());
+      return async ({ step, ctx }) => {
+        const data = ctx.data as { isLocked: boolean };
+        if (data && data.isLocked !== undefined) {
+          setLocked(data.isLocked);
+        }
+        await step.condition("wait-unlock", () => locked() === false);
+        return "unlocked";
+      };
+    },
+  );
   const initial = buildInstance("LockerToUnlock", { isLocked: true });
   const abortSignal = new AbortController().signal;
   await t.step("init condition", async () => {
@@ -226,6 +228,12 @@ Deno.test("LockerToUnlock", async (t) => {
           completed: false,
         },
       ],
+      queries: {
+        isLocked: true,
+      },
+      state: {
+        isLocked: true,
+      },
     });
   });
   await t.step("signal unlocking", async () => {
@@ -259,6 +267,12 @@ Deno.test("LockerToUnlock", async (t) => {
           completed: true,
         },
       ],
+      queries: {
+        isLocked: false,
+      },
+      state: {
+        isLocked: false,
+      },
     });
   });
   await t.step("completed", async () => {
@@ -285,6 +299,27 @@ Deno.test("LockerToUnlock", async (t) => {
     assertEquals(result, {
       completed: true,
       result: "unlocked",
+      queries: {
+        isLocked: false,
+      },
     });
+  });
+});
+Deno.test("CorrectConstructEvent", async (t) => {
+  const fns = new Fns({ token: "Hello world" });
+  fns.createFunction({ name: "test", version: 1 }, () => async ({ step }) => {
+    await step.sleep("wait-10s", "10s");
+    return "End!";
+  });
+  const initial = buildInstance("test", null);
+  const initialRaw = JSON.stringify(initial);
+  await t.step("constructEvent with valid signature", async () => {
+    const signature = await sign(initialRaw, "Hello world");
+    const event = await fns.constructEvent(initialRaw, signature);
+    assertEquals(event, initial);
+  });
+  await t.step("constructEvent with invalid signature", async () => {
+    const signature = await sign(initialRaw, "invalid secret");
+    assertRejects(async () => await fns.constructEvent(initialRaw, signature));
   });
 });

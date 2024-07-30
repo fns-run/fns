@@ -1,4 +1,5 @@
 import { type Fns, FNS_SIGNATURE_HEADER } from "./index.ts";
+// @deno-types="npm:@types/express@4.19.2"
 import type { Request, Response } from "npm:express@4.19.2";
 
 export function serve(
@@ -9,7 +10,7 @@ export function serve(
     const abortController = new AbortController();
 
     try {
-      const event = client.constructEvent(
+      const event = await client.constructEvent(
         req.body.toString("utf8"),
         req.headers[FNS_SIGNATURE_HEADER] as string,
       );

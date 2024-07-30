@@ -1,24 +1,28 @@
 import { assert, assertExists } from "../deps.ts";
 import { ms } from "./ms.ts";
 import { verify } from "./signature.ts";
-import type {
-  FnsFunction,
-  FnsRemoteFunction,
-  FnsRequestParams,
-  FnsResponse,
-  Mutation,
-  Params,
-  Query,
-  Schema,
-  StateGetter,
-  StepType,
+import {
+  type FnsFunction,
+  type FnsRemoteFunction,
+  type FnsRequestParams,
+  type FnsResponse,
+  type Mutation,
+  type Params,
+  type Query,
+  type Schema,
+  type StateGetter,
+  type StepType,
+  zFnsRequestParams,
 } from "./types.ts";
 import { block, execute } from "./helper.ts";
 import { xxHash32 } from "./xxhash32.ts";
 import { NonRetriableError } from "./errors.ts";
+let performanceCounter: () => number = performance.now;
+export function setPerformanceCounter(cb: () => number): void {
+  performanceCounter = cb;
+}
 
 export const FNS_SIGNATURE_HEADER = "x-fns-signature";
-
 interface FnsExternalConfig {
   checksum: number;
   definitions: Definition[];
@@ -119,14 +123,15 @@ export class Fns {
     const res = await this.GET<T>(`/executions/${args.id}/query/${args.query}`);
     return res;
   }
-  constructEvent(body: string, signature: string): FnsRequestParams {
-    if (!this._options.dev) {
-      if (!this._options.token) throw new Error("Token is required");
-      if (!verify(body, this._options.token, signature)) {
-        throw new Error("Invalid signature");
-      }
-    }
-    const event = JSON.parse(body) as FnsRequestParams;
+  async constructEvent(
+    body: string,
+    signature: string,
+  ): Promise<FnsRequestParams> {
+    const event: FnsRequestParams = await zFnsRequestParams.parseAsync(JSON.parse(body)) as FnsRequestParams;
+    if (this._options.dev) return event;
+    if (!this._options.token) throw new Error("A valid token is required");
+    const isVerified = await verify(body, this._options.token, signature);
+    if (!isVerified) throw new Error("Signature verification failed");
     return event;
   }
   async onHandler(
@@ -197,12 +202,12 @@ export class Fns {
         complete(step.result);
         return step.result as T;
       }
-      const start = performance.now();
+      const start = performanceCounter();
       await write((result) =>
         mutations.push({
           id,
           result,
-          elapsed: Math.round(performance.now() - start),
+          elapsed: Math.round(performanceCounter() - start),
           completed: true,
         })
       );
@@ -341,10 +346,7 @@ export class Fns {
       assertExists(id, "id is required");
       assert(typeof id === "string", "id must be a string");
       assert(!init, "useState must be called at initialization");
-      if (!(id in state)) {
-        state[id] = initial;
-        stateChanges.add(id);
-      }
+      if (!(id in state)) SetState(initial);
       function SetState(
         newState:
           | typeof initial

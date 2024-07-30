@@ -1,3 +1,54 @@
+import { z } from "../deps.ts";
+
+export const zStepType = z.union([
+  z.literal("run"),
+  z.literal("sleep"),
+  z.literal("condition"),
+  z.literal("signal"),
+  z.literal("lock"),
+  z.literal("unlock"),
+  z.literal("invoke"),
+  z.literal("trigger"),
+  z.literal("query"),
+  z.literal("get"),
+]);
+export const zParams = z.union([
+  z.object({
+    signal: z.string(),
+  }).strict(),
+  z.object({
+    timeout: z.number(),
+  }).strict(),
+  z.object({
+    until: z.string(),
+  }).strict(),
+  z.object({
+    keys: z.array(z.string()),
+  }).strict(),
+  z.null(),
+]);
+
+export const zStep = z.object({
+  id: z.string(),
+  type: zStepType,
+  params: zParams,
+  completed: z.boolean(),
+  result: z.unknown(),
+}).strict();
+export const zFnsRequestParams = z.object({
+  id: z.string(),
+  run_id: z.string(),
+  name: z.string(),
+  data: z.unknown(),
+  snapshot: z.boolean(),
+  steps: z.array(zStep),
+  state: z.record(z.unknown()),
+});
+export type zStep = z.infer<typeof zStep>;
+export type zStepType = z.infer<typeof zStepType>;
+export type zParams = z.infer<typeof zParams>;
+export type zFnsRequestParams = z.infer<typeof zFnsRequestParams>;
+
 export interface Query {
   name: string;
   cb: () => unknown;
