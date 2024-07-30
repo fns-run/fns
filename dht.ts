@@ -15,7 +15,7 @@ await build({
     version: Deno.args[0],
     description:
       "Fns is the React for backend development, making serverless functions invincible. It offers a zero-infrastructure platform with reliable execution, signal handling, all with built-in observability.",
-    license: "Apache-2",
+    license: "Apache-2.0",
     homepage: "https://github.com/fns-run/fns",
     repository: {
       type: "git",
