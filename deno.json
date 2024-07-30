@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "exports": "./mod.ts",
   "tasks": {
-    "test": "deno test -A --coverage=coverage --clean",
-    "coverage": "deno coverage coverage"
+    "test": "deno test -A --coverage=coverage --clean --trace-leaks --seed 8 --parallel",
+    "coverage": "deno coverage coverage/"
   }
 }

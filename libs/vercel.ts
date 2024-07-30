@@ -1,20 +1,11 @@
 import { type Fns, FNS_SIGNATURE_HEADER } from "./index.ts";
 import type { VercelRequest, VercelResponse } from "npm:@vercel/node@3.1.5";
-//import type { Readable } from "node:stream";
 
 export const config = {
   api: {
     bodyParser: false,
   },
 };
-/*
-async function readableToString2(readable: Readable) {
-  let result = "";
-  for await (const chunk of readable) {
-    result += chunk;
-  }
-  return result;
-}*/
 
 export function serve(
   client: Fns,
