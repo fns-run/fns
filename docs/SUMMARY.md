@@ -4,7 +4,10 @@
 
 * [Quick Start](README.md)
 
-## Fns Basics
+## Basics
 
-* [First Steps](fns-basics/first-steps.md)
-* [Web Frameworks](fns-basics/web-frameworks.md)
+* [First Steps](basics/first-steps.md)
+* [Signals & Queries](basics/signals-and-queries.md)
+* [Smart Locks](basics/smart-locks.md)
+* [Auto Snapshot](basics/auto-snapshot.md)
+* [Frameworks](basics/frameworks.md)
