@@ -12,8 +12,6 @@
 **Fns SDK** is a serverless stateless durable function design pattern. Works
 with any framework and platform.
 
-<img src="assets/example.png" alt="drawing" width="500"/>
-
 ## Key Features
 
 - **Infinite Loop**: Run durable function for an infinite amount of time with
@@ -25,12 +23,56 @@ with any framework and platform.
 - **Mutexes**: Solve race conditions at scale with intuitively.
 - **Awaitable**: Await for the result of a function or signal.
 
-## Core Philosophy
+## Example
 
-- **Deterministic**
-- **Explicit**
-- **Minimalistic**
+```ts
+fns.createFunction(
+  { name: "helloworld", version: 1 },
+  ({ useState, useSignal }) => {
+    const [name, setName] = useState<string>("name", "John Travolta");
+    useSignal<string>("setName", (newName) => setName(newName));
 
+    return async ({ step }) => {
+      const firstName = await step.run(
+        "set-firstname",
+        async () =>
+          await fetch("https://api.namefake.com/")
+            .then((res) => res.json())
+            .then((res) => res.name),
+      );
+      await step.sleep("wait-10s-then-finish", "5s");
+      const lastName = await step.run(
+        "set-lastname-Fernandes",
+        async () =>
+          await fetch("https://api.namefake.com/")
+            .then((res) => res.json())
+            .then((res) => res.name),
+      );
+
+      return `Hello ${firstName} ${lastName}`;
+    };
+  },
+);
+```
+
+```ts
+fns.createFunction(
+  { name: "LockerBox", version: 1 },
+  ({ useSignal, useQuery, useState }) => {
+    const [locked, setLocked] = useState<boolean>("isLocked", true);
+    useSignal("unlock", () => setLocked(false));
+    useQuery("isLocked", () => locked());
+    return async ({ step, ctx }) => {
+      const data = ctx.data as { isLocked: boolean };
+      if (data && data.isLocked !== undefined) {
+        setLocked(data.isLocked);
+      }
+      await step.condition("wait-unlock", () => locked() === false);
+      return "unlocked";
+    };
+  },
+);
+```
 ## License
 
 <a href="https://opensource.org/license/apache-2-0">
