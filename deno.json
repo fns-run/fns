@@ -1,7 +1,15 @@
 {
   "name": "@fns-run/fns",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "exports": "./mod.ts",
+  "publish": {
+    "exclude": [
+      "assets/",
+      "examples/",
+      "./**/*_test.ts",
+      "./**/*_bench.ts"
+    ]
+  },
   "compilerOptions": {
     "noImplicitReturns": true
   },
