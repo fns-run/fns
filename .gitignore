@@ -130,3 +130,13 @@ dist
 .pnp.*
 # .DS_Store files all
 **/.DS_Store
+
+coverage/
+npm/
+.idea
+.vim
+**/cov/
+deno.lock
+html_cov/
+cov.lcov
+deno.lock
