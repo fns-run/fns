@@ -44,6 +44,9 @@ await build({
       "durable-execution",
       "zero-infrastructure",
     ],
+    devDependencies: {
+      "@types/express": "^4.17.15",
+    }
   },
   postBuild() {
     // steps to run after building and before running the tests

@@ -1,4 +1,4 @@
-import { assertEquals, assertInstanceOf } from "@std/assert";
+import { assertEquals, assertInstanceOf } from "../deps.ts";
 import { NonRetriableError } from "./errors.ts";
 
 Deno.test("NonRetriableError: Should have correct name and message", () => {

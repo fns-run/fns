@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "../deps.ts";
 import { toUtf8, xxHash32 } from "./xxhash32.ts"; // Adjust the import path as necessary
 
 Deno.test("toUtf8() - convert string to UTF-8 encoded Uint8Array", () => {

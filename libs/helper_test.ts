@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals, assertRejects } from "../deps.ts";
 import { block, execute, resolveNextTick } from "./helper.ts";
 
 Deno.test("resolveNextTick() - resolves after next tick", async () => {

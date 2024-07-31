@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "../deps.ts";
 import { ms } from "./ms.ts"; // Adjust the import path as necessary
 
 Deno.test("ms() - parse string to milliseconds", () => {

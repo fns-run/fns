@@ -1,4 +1,4 @@
-import { assert, assertExists } from "@std/assert";
+import { assert, assertExists } from "../deps.ts";
 import { ms } from "./ms.ts";
 import { verify } from "./signature.ts";
 import type {

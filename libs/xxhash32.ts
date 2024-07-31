@@ -1,4 +1,4 @@
-import { assert } from "@std/assert";
+import { assert } from "../deps.ts";
 
 const PRIME32_1 = 2654435761;
 const PRIME32_2 = 2246822519;

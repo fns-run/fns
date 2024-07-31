@@ -1,5 +1,5 @@
 // url_test.ts
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "../deps.ts";
 import { Fns, setPerformanceCounter } from "./index.ts";
 import { sign } from "./signature.ts";
 import type { FnsRequestParams } from "./types.ts";
