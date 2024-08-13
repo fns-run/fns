@@ -15,7 +15,12 @@ import type {
 } from "./types.ts";
 import { block, execute } from "./helper.ts";
 import { xxHash32 } from "./xxhash32.ts";
-import { InvalidSignatureError, NonRetriableError, SignatureVerificationError, SigningKeyRequiredError } from "./errors.ts";
+import {
+  InvalidSignatureError,
+  NonRetriableError,
+  SignatureVerificationError,
+  SigningKeyRequiredError,
+} from "./errors.ts";
 import { safeDestr } from "./destr.ts";
 import { ExecutionsClient } from "./clients/executions.ts";
 import type { FnsConfig } from "./clients/client.ts";
@@ -45,7 +50,7 @@ type Definition = {
   queries: string[];
   signals: string[];
   schema: Schema;
-}
+};
 export class Fns {
   private config: FnsOptions;
   private definitions: Map<string, Definition> = new Map();
@@ -93,7 +98,7 @@ export class Fns {
     const output = await this.engine(event, definition.fn, abortSignal);
     return output as FnsResponse;
   }
-  private async engine(                                  
+  private async engine(
     event: FnsRequestParams,
     fn: FnsFunction,
     abortSignal: AbortSignal,
@@ -358,7 +363,7 @@ export class Fns {
         name: query,
         cb,
         dependencies: dependencies.map((dep) => dep.id),
-      }
+      };
       queries.push(row);
     }
     const bootstrap = await fn({ useSignal, useQuery, useState });
@@ -431,7 +436,7 @@ export class Fns {
           currentStateScope = q;
           const res = q.cb();
           currentStateScope = null;
-          return [q.name, res]
+          return [q.name, res];
         }),
     );
     if (isCompleted) {
@@ -483,7 +488,7 @@ export class Fns {
         useState(name: string, initial) {
           states[name] = initial;
           return [() => initial, () => {}];
-        }
+        },
       });
       assertExists(output, "must return a function");
       assert(typeof output === "function", "must return a function");

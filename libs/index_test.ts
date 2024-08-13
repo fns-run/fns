@@ -268,11 +268,13 @@ Deno.test("LockerToUnlock", async (t) => {
 });
 Deno.test("CorrectConstructEvent", async (t) => {
   const fns = new Fns({ signingKey: "Hello world", baseUrl: "none" });
-  fns.registerFunctions(fns.createFunction({ name: "test", version: 1 }, () => async ({ step }) => {
-    await step.sleep("wait-10s", "10s");
-    return "End!";
-  }));
-  
+  fns.registerFunctions(
+    fns.createFunction({ name: "test", version: 1 }, () => async ({ step }) => {
+      await step.sleep("wait-10s", "10s");
+      return "End!";
+    }),
+  );
+
   const initial = buildInstance("test", null);
   const initialRaw = JSON.stringify(initial);
   await t.step("constructEvent with valid signature", async () => {
