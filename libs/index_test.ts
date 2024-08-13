@@ -15,11 +15,13 @@ function buildInstance(name: string, data?: unknown): FnsRequestParams {
     steps: [],
     state: {},
     snapshot: false,
+    version: 1,
+    checksum: 0,
   };
 }
 Deno.test("DefineFirstNameAndLastName", async (t) => {
-  const fns = new Fns({ dev: true });
-  fns.createFunction(
+  const fns = new Fns({ dev: true, baseUrl: "none" });
+  fns.registerFunctions(fns.createFunction(
     { name: "DefineFirstNameAndLastName", version: 1 },
     () => async ({ step, ctx }) => {
       const data = ctx.data as { prefix: string };
@@ -33,22 +35,30 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
       });
       return `Hello ${data.prefix} ${firstName} ${lastName}`;
     },
-  );
+  ));
 
   const initial = buildInstance("DefineFirstNameAndLastName", { prefix: "Mr" });
   const abortSignal = new AbortController().signal;
   await t.step("init define-firstname", async () => {
-    const result = await fns.onHandler(initial, abortSignal);
+    const result = await fns.onHandler({
+      ...initial,
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    }, abortSignal);
     assertEquals(result, {
-      completed: false,
+      status: "incomplete",
       mutations: [
         {
           id: "define-firstname",
           type: "run",
           params: null,
-          completed: false,
+          status: "pending",
         },
       ],
+      queries: {},
+      state: {},
+      error: null,
+      result: null,
     });
   });
   await t.step("memo define-firstname", async () => {
@@ -59,74 +69,34 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
           id: "define-firstname",
           type: "run",
           params: null,
-          completed: false,
-          result: undefined,
+          status: "pending",
+          result: null,
         },
       ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
-      completed: false,
+      status: "incomplete",
       mutations: [
         {
           id: "define-firstname",
-          completed: true,
+          status: "completed",
           elapsed: 0,
           result: "lucas",
         },
-      ],
-    });
-  });
-  await t.step("define wait-10s", async () => {
-    const params: FnsRequestParams = {
-      ...initial,
-      steps: [
-        {
-          id: "define-firstname",
-          completed: true,
-          result: "lucas",
-          type: "run",
-          params: null,
-        },
-      ],
-    };
-    const result = await fns.onHandler(params, abortSignal);
-    assertEquals(result, {
-      completed: false,
-      mutations: [
         {
           id: "wait-10s",
           type: "sleep",
           params: { timeout: 10000 },
-          completed: false,
+          status: "pending",
         },
       ],
-    });
-  });
-  await t.step("wait wait-10s", async () => {
-    const params: FnsRequestParams = {
-      ...initial,
-      steps: [
-        {
-          id: "define-firstname",
-          completed: true,
-          result: "lucas",
-          type: "run",
-          params: null,
-        },
-        {
-          id: "wait-10s",
-          type: "sleep",
-          params: { timeout: 10000 },
-          result: null,
-          completed: false,
-        },
-      ],
-    };
-    const result = await fns.onHandler(params, abortSignal);
-    assertEquals(result, {
-      completed: false,
-      mutations: [],
+      queries: {},
+      state: {},
+      error: null,
+      result: null,
     });
   });
   await t.step("define lastname", async () => {
@@ -135,7 +105,7 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
       steps: [
         {
           id: "define-firstname",
-          completed: true,
+          status: "completed",
           result: "lucas",
           type: "run",
           params: null,
@@ -145,21 +115,25 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
           type: "sleep",
           params: { timeout: 10000 },
           result: null,
-          completed: true,
+          status: "completed",
         },
       ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
-      completed: false,
-      mutations: [
-        {
-          completed: false,
-          id: "define-lastname",
-          params: null,
-          type: "run",
-        },
-      ],
+      status: "incomplete",
+      mutations: [{
+        status: "pending",
+        id: "define-lastname",
+        params: null,
+        type: "run",
+      }],
+      queries: {},
+      state: {},
+      error: null,
+      result: null,
     });
   });
   await t.step("memo lastname", async () => {
@@ -168,7 +142,7 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
       steps: [
         {
           id: "define-firstname",
-          completed: true,
+          status: "completed",
           result: "lucas",
           type: "run",
           params: null,
@@ -178,27 +152,33 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
           type: "sleep",
           params: { timeout: 10000 },
           result: null,
-          completed: true,
+          status: "completed",
         },
         {
-          completed: true,
+          status: "completed",
           id: "define-lastname",
           params: null,
           type: "run",
           result: "marie",
         },
       ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
-      completed: true,
+      status: "completed",
       result: "Hello Mr lucas marie",
+      mutations: [],
+      error: null,
+      queries: {},
+      state: {},
     });
   });
 });
 Deno.test("LockerToUnlock", async (t) => {
-  const fns = new Fns({ dev: true });
-  fns.createFunction(
+  const fns = new Fns({ dev: true, baseUrl: "none" });
+  fns.registerFunctions(fns.createFunction(
     { name: "LockerToUnlock", version: 1 },
     ({ useSignal, useQuery, useState }) => {
       const [locked, setLocked] = useState<boolean>("isLocked", true);
@@ -213,19 +193,23 @@ Deno.test("LockerToUnlock", async (t) => {
         return "unlocked";
       };
     },
-  );
+  ));
   const initial = buildInstance("LockerToUnlock", { isLocked: true });
   const abortSignal = new AbortController().signal;
   await t.step("init condition", async () => {
-    const result = await fns.onHandler(initial, abortSignal);
+    const result = await fns.onHandler({
+      ...initial,
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    }, abortSignal);
     assertEquals(result, {
-      completed: false,
+      status: "incomplete",
       mutations: [
         {
           id: "wait-unlock",
           params: null,
           type: "condition",
-          completed: false,
+          status: "pending",
         },
       ],
       queries: {
@@ -234,6 +218,8 @@ Deno.test("LockerToUnlock", async (t) => {
       state: {
         isLocked: true,
       },
+      result: null,
+      error: null,
     });
   });
   await t.step("signal unlocking", async () => {
@@ -244,27 +230,30 @@ Deno.test("LockerToUnlock", async (t) => {
           id: "wait-unlock",
           type: "run",
           params: null,
-          result: undefined,
-          completed: false,
+          result: null,
+          status: "pending",
         },
         {
           id: "signal",
           type: "signal",
           params: { signal: "unlock" },
-          result: undefined,
-          completed: true,
+          result: null,
+          status: "completed",
         },
       ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
-      completed: false,
+      status: "completed",
+      result: "unlocked",
       mutations: [
         {
           id: "wait-unlock",
           result: true,
           elapsed: 0,
-          completed: true,
+          status: "completed",
         },
       ],
       queries: {
@@ -273,44 +262,17 @@ Deno.test("LockerToUnlock", async (t) => {
       state: {
         isLocked: false,
       },
-    });
-  });
-  await t.step("completed", async () => {
-    const params: FnsRequestParams = {
-      ...initial,
-      steps: [
-        {
-          id: "wait-unlock",
-          type: "run",
-          params: null,
-          result: true,
-          completed: true,
-        },
-        {
-          id: "signal",
-          type: "signal",
-          params: { signal: "unlock" },
-          result: undefined,
-          completed: true,
-        },
-      ],
-    };
-    const result = await fns.onHandler(params, abortSignal);
-    assertEquals(result, {
-      completed: true,
-      result: "unlocked",
-      queries: {
-        isLocked: false,
-      },
+      error: null,
     });
   });
 });
 Deno.test("CorrectConstructEvent", async (t) => {
-  const fns = new Fns({ token: "Hello world" });
-  fns.createFunction({ name: "test", version: 1 }, () => async ({ step }) => {
+  const fns = new Fns({ signingKey: "Hello world", baseUrl: "none" });
+  fns.registerFunctions(fns.createFunction({ name: "test", version: 1 }, () => async ({ step }) => {
     await step.sleep("wait-10s", "10s");
     return "End!";
-  });
+  }));
+  
   const initial = buildInstance("test", null);
   const initialRaw = JSON.stringify(initial);
   await t.step("constructEvent with valid signature", async () => {
@@ -321,5 +283,270 @@ Deno.test("CorrectConstructEvent", async (t) => {
   await t.step("constructEvent with invalid signature", async () => {
     const signature = await sign(initialRaw, "invalid secret");
     assertRejects(async () => await fns.constructEvent(initialRaw, signature));
+  });
+});
+Deno.test("EfficientStateManagement", async (t) => {
+  const fns = new Fns({ dev: true, baseUrl: "none" });
+  fns.registerFunctions(fns.createFunction(
+    { name: "EfficientStateManagement", version: 1 },
+    ({ useState }) => {
+      const [counter, setCounter] = useState<number>("counter", 0);
+      return async ({ step }) => {
+        await step.run("fake-step-1", () => {});
+        await step.run("fake-step-2", () => {});
+        await step.run("fake-step-3", () => {});
+        setCounter(counter()! + 1);
+        await step.run("fake-step-4", () => {});
+        await step.run("fake-step-5", () => {});
+        return counter();
+      };
+    },
+  ));
+  const initial = buildInstance("EfficientStateManagement", null);
+  const abortSignal = new AbortController().signal;
+  await t.step("init state", async () => {
+    const result = await fns.onHandler({
+      ...initial,
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    }, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      mutations: [
+        {
+          id: "fake-step-1",
+          type: "run",
+          params: null,
+          status: "pending",
+        },
+      ],
+      queries: {},
+      state: {
+        counter: 0,
+      },
+      result: null,
+      error: null,
+    });
+  });
+  await t.step("next state 1", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "fake-step-1",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      mutations: [
+        {
+          id: "fake-step-2",
+          type: "run",
+          params: null,
+          status: "pending",
+        },
+      ],
+      queries: {},
+      state: {},
+      result: null,
+      error: null,
+    });
+  });
+  await t.step("next state 2", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "fake-step-1",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-2",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      mutations: [
+        {
+          id: "fake-step-3",
+          type: "run",
+          params: null,
+          status: "pending",
+        },
+      ],
+      queries: {},
+      state: {},
+      result: null,
+      error: null,
+    });
+  });
+  await t.step("next state 3", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "fake-step-1",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-2",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-3",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      mutations: [{
+        id: "fake-step-4",
+        type: "run",
+        params: null,
+        status: "pending",
+      }],
+      queries: {},
+      state: {
+        counter: 1,
+      },
+      result: null,
+      error: null,
+    });
+  });
+  await t.step("next state 4", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "fake-step-1",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-2",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-3",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-4",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      result: null,
+      mutations: [{
+        id: "fake-step-5",
+        type: "run",
+        params: null,
+        status: "pending",
+      }],
+      queries: {},
+      state: {},
+      error: null,
+    });
+  });
+  await t.step("next state 5", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "fake-step-1",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-2",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-3",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-4",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-5",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "completed",
+      result: 1,
+      mutations: [],
+      queries: {},
+      state: {},
+      error: null,
+    });
   });
 });

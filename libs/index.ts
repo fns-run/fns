@@ -3,7 +3,7 @@ import { ms } from "./ms.ts";
 import { verify } from "./signature.ts";
 import type {
   FnsFunction,
-  FnsRemoteFunction,
+  FnsOptions,
   FnsRequestParams,
   FnsResponse,
   Mutation,
@@ -15,40 +15,28 @@ import type {
 } from "./types.ts";
 import { block, execute } from "./helper.ts";
 import { xxHash32 } from "./xxhash32.ts";
-import { NonRetriableError } from "./errors.ts";
+import { InvalidSignatureError, NonRetriableError, SignatureVerificationError, SigningKeyRequiredError } from "./errors.ts";
+import { safeDestr } from "./destr.ts";
+import { ExecutionsClient } from "./clients/executions.ts";
+import type { FnsConfig } from "./clients/client.ts";
+import { QueriesClient } from "./clients/queries.ts";
+import { StepsClient } from "./clients/steps.ts";
+import { RunsClient } from "./clients/runs.ts";
+import { ErrorsClient } from "./clients/errors.ts";
+
 let performanceCounter: () => number = performance.now;
 export function setPerformanceCounter(cb: () => number): void {
   performanceCounter = cb;
 }
 
 export const FNS_SIGNATURE_HEADER = "x-fns-signature";
+
 interface FnsExternalConfig {
   checksum: number;
-  definitions: Definition[];
-}
-interface StartExecutionArgs {
-  id: string;
-  name: string;
-  data: unknown;
-}
-interface TriggerExecutionArgs {
-  id: string;
-  signal: string;
-  data: unknown;
-  idempotencyKey?: string;
-}
-interface QueryExecutionArgs {
-  id: string;
-  query: string;
+  definitions: Map<string, Definition>;
 }
 
-export interface FnsOptions {
-  dev?: boolean;
-  endpoint?: string;
-  token?: string;
-  apiKey?: string;
-}
-interface Definition {
+type Definition = {
   name: string;
   fn: FnsFunction;
   version: number;
@@ -59,90 +47,53 @@ interface Definition {
   schema: Schema;
 }
 export class Fns {
-  private _definitions: Definition[];
-  private _options: FnsOptions;
-  private _ver: number;
-  constructor(options: FnsOptions) {
-    this._definitions = [];
-    this._options = options;
-    this._ver = 0;
-  }
-  /* TODO: Seperate to a client class */
-  private async POST<T = unknown>(
-    endpoint: string,
-    body: unknown,
-    headers: Record<string, string> = {},
-  ): Promise<T> {
-    if (!this._options.endpoint) throw new Error("Endpoint is required");
-    const url = new URL(endpoint, this._options.endpoint);
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        ...headers,
-        "Content-Type": "application/json",
-        Authorization: `ApiKey ${this._options.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`);
-    return await res.json() as T;
-  }
-  private async GET<T>(endpoint: string): Promise<T> {
-    if (!this._options.endpoint) throw new Error("Endpoint is required");
-    const url = new URL(endpoint, this._options.endpoint);
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `ApiKey ${this._options.apiKey}`,
-      },
-    });
-    if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`);
-    return await res.json() as T;
-  }
-  async invoke(args: StartExecutionArgs): Promise<string> {
-    const res = await this.POST<string>(
-      "/executions/create",
-      args,
-    );
-    return res;
-  }
-  async result<T>(id: string): Promise<T> {
-    const res = await this.GET<T>(`/executions/${id}/result`);
-    return res;
-  }
-  async trigger(args: TriggerExecutionArgs): Promise<void> {
-    await this.POST<void>(
-      `/executions/${args.id}/trigger`,
-      { signal: args.signal, data: args.data },
-      args.idempotencyKey
-        ? { "x-fns-idempotency-key": args.idempotencyKey }
-        : {},
-    );
-  }
-  async query<T>(args: QueryExecutionArgs): Promise<T> {
-    const res = await this.GET<T>(`/executions/${args.id}/query/${args.query}`);
-    return res;
+  private config: FnsOptions;
+  private definitions: Map<string, Definition> = new Map();
+  private version: number = 0;
+  executions: ExecutionsClient;
+  queries: QueriesClient;
+  steps: StepsClient;
+  runs: RunsClient;
+  errors: ErrorsClient;
+  constructor(config: FnsConfig) {
+    this.config = config;
+    this.executions = new ExecutionsClient(config);
+    this.queries = new QueriesClient(config);
+    this.steps = new StepsClient(config);
+    this.runs = new RunsClient(config);
+    this.errors = new ErrorsClient(config);
   }
   async constructEvent(
     body: string,
     signature: string,
   ): Promise<FnsRequestParams> {
-    const event: FnsRequestParams = JSON.parse(body) as FnsRequestParams;
-    if (this._options.dev) return event;
-    if (!this._options.token) throw new Error("A valid token is required");
-    const isVerified = await verify(body, this._options.token, signature);
-    if (!isVerified) throw new Error("Signature verification failed");
+    const event: FnsRequestParams = safeDestr<FnsRequestParams>(body);
+    if (this.config.dev) return event;
+    if (!this.config.signingKey) throw new SigningKeyRequiredError();
+    let isVerified: boolean = false;
+    try {
+      isVerified = await verify(body, this.config.signingKey, signature);
+    } catch (err) {
+      throw new SignatureVerificationError(err.message);
+    }
+    if (!isVerified) throw new InvalidSignatureError();
     return event;
   }
   async onHandler(
     event: FnsRequestParams,
     abortSignal: AbortSignal,
   ): Promise<FnsResponse> {
-    const workflow = this._definitions.find((w) => w.name === event.name);
-    if (!workflow) throw new Error(`Function ${event.name} not found`);
-    const output = await this.engine(event, workflow.fn, abortSignal);
+    const definition = this.definitions.get(event.name);
+    if (!definition) throw new Error(`Function ${event.name} not found`);
+    if (definition.version !== event.version) {
+      throw new Error(
+        `Function ${event.name} version ${definition.version} mismatch with request version ${event.version}`,
+      );
+    }
+    const output = await this.engine(event, definition.fn, abortSignal);
     return output as FnsResponse;
   }
-  private async engine(
+  private async engine(                                  
     event: FnsRequestParams,
     fn: FnsFunction,
     abortSignal: AbortSignal,
@@ -171,6 +122,8 @@ export class Fns {
         cb(next.result);
       }
     }
+    const isReplay = () => steps.length > tick;
+    let currentStateScope: Query | null = null;
     async function memo<T = unknown>(
       id: string,
       type: StepType,
@@ -192,25 +145,31 @@ export class Fns {
       assert(init, "memo must be called at initialization");
       const step = steps[tick++];
       unrollSignals();
-      if (!step) { // initialize
-        mutations.push({ id, type, params, completed: false });
+      if (!step) {
+        mutations.push({ id, type, params, status: "pending" });
         return await block<T>();
       }
       assert(step.id === id, `Invalid step id ${step.id} expected ${id}`);
-      if (step.completed) {
+      if (step.status === "completed") {
         complete(step.result);
         return step.result as T;
       }
       const start = performanceCounter();
-      await write((result) =>
+      let isSetted = false;
+      let retn: T = null!;
+      await write((result) => {
         mutations.push({
           id,
           result,
           elapsed: Math.round(performanceCounter() - start),
-          completed: true,
-        })
-      );
-      return await block<T>();
+          status: "completed",
+        });
+        retn = result as T;
+        isSetted = true;
+      });
+      if (!isSetted) return await block<T>();
+      complete(retn);
+      return retn as T;
     }
     async function run<T = unknown>(
       id: string,
@@ -272,7 +231,7 @@ export class Fns {
         id,
         "condition",
         params,
-        (done) => cb() && done(true),
+        (write) => cb() && write(true),
       );
     }
     async function lock(
@@ -301,10 +260,9 @@ export class Fns {
         params,
         () => {},
         (res) => {
-          if (res) {
-            for (let i = 0; i < keys.length; i++) {
-              mutexes.add(keys[i]);
-            }
+          if (!res) return;
+          for (let i = 0; i < keys.length; i++) {
+            mutexes.add(keys[i]);
           }
         },
       );
@@ -331,15 +289,22 @@ export class Fns {
         cb,
       );
     }
+    function repeat(
+      _id: string,
+      _cron: string | { every: string | number; times?: number },
+      _cb: (idx: number) => undefined | boolean | Promise<undefined | boolean>,
+    ): Promise<void> {
+      throw new NonRetriableError("repeat not implemented");
+    }
     function useState<T = unknown>(
       id: string,
-      initial?: T,
+      initial: T,
     ): [
-      StateGetter<typeof initial>,
+      StateGetter<T>,
       (
         newState:
-          | typeof initial
-          | ((prevState: typeof initial) => typeof initial),
+          | T
+          | ((prevState: T) => T),
       ) => void,
     ] {
       assertExists(id, "id is required");
@@ -348,16 +313,18 @@ export class Fns {
       if (!(id in state)) SetState(initial);
       function SetState(
         newState:
-          | typeof initial
-          | ((prevState: typeof initial) => typeof initial),
+          | T
+          | ((prevState: T) => T),
       ) {
+        if (isReplay()) return;
         state[id] = typeof newState === "function"
           ? (newState as (previous: T) => T)(state[id] as T)
           : newState;
         stateChanges.add(id);
       }
       function GetState() {
-        return state[id] as typeof initial;
+        console.log(currentStateScope);
+        return state[id] as T;
       }
       GetState.id = id;
       return [GetState, SetState];
@@ -387,65 +354,14 @@ export class Fns {
         !queries.find((q) => q.name === query),
         `Query ${query} already in use`,
       );
-      queries.push({
+      const row: Query = {
         name: query,
         cb,
         dependencies: dependencies.map((dep) => dep.id),
-      });
-    }
-    function useFunctions(_names: string[]): Record<string, FnsRemoteFunction> {
-      throw new NonRetriableError("useFunctions not implemented");
-      /*
-      const interfaces = {};
-      for (let i = 0; i < names.length; i++) {
-        const name = names[i];
-        interfaces[name] = {
-          get: async (id: string, options: { id: string }) => {
-            return await memo(id, "get", { id: options.id }, () => {});
-          },
-          invoke: async (id: string, options: { id?: string; data?: unknown }) => {
-            return await memo(id, "invoke", {
-              id: options.id ?? null,
-              name,
-              data: options.data,
-            }, () => {});
-          },
-          trigger: async (
-            id: string,
-            options: { id: string; signal: string; data?: unknown },
-          ) => {
-            return await memo(id, "trigger", {
-              id,
-              name,
-              signal: options.signal,
-              data: options.data,
-            }, () => {});
-          },
-          query: async (id: string, options: { id: string; query: string }) => {
-            return await memo(
-              id,
-              "query",
-              { id, name, query: options.query },
-              () => {},
-            );
-          },
-          result: async (
-            id: string,
-            options: { id: string; query: string },
-          ) => {
-            return await memo(
-              id,
-              "query",
-              { id, name, query: options.query },
-              () => {},
-            );
-          },
-        };
       }
-      return interfaces;
-      */
+      queries.push(row);
     }
-    const bootstrap = await fn({ useSignal, useQuery, useState, useFunctions });
+    const bootstrap = await fn({ useSignal, useQuery, useState });
     assertExists(bootstrap, "must return a function");
     assert(typeof bootstrap === "function", "must return a function");
     unrollSignals();
@@ -466,6 +382,7 @@ export class Fns {
           condition,
           lock,
           unlock,
+          repeat,
           checkpoint: function (): Promise<boolean> {
             throw new Error("Function not implemented.");
           },
@@ -486,16 +403,19 @@ export class Fns {
         },
       }));
     } catch (e) {
-      let retryable = true;
-      if (e instanceof NonRetriableError) retryable = false;
+      const retryable = !(e instanceof NonRetriableError);
       return {
-        completed: false,
+        status: "error",
         error: {
           message: e.message,
           stack: e.stack ?? "",
           name: e.name,
           retryable,
         },
+        mutations: [],
+        queries: {},
+        state: {},
+        result: null,
       };
     }
     const applyState = Object.fromEntries(
@@ -507,29 +427,36 @@ export class Fns {
           q.dependencies.length == 0 ||
           q.dependencies.some((dep) => stateChanges.has(dep))
         )
-        .map((q) => [q.name, q.cb()]),
+        .map((q) => {
+          currentStateScope = q;
+          const res = q.cb();
+          currentStateScope = null;
+          return [q.name, res]
+        }),
     );
-
     if (isCompleted) {
       return {
-        completed: true,
+        status: "completed",
+        mutations,
         result,
-        ...Object.keys(applyQueries).length > 0
-          ? { queries: applyQueries }
-          : {},
+        queries: applyQueries,
+        state: applyState,
+        error: null,
       };
     }
     return {
-      completed: false,
+      status: "incomplete",
       mutations,
-      ...stateChanges.size > 0 ? { state: applyState } : {},
-      ...Object.keys(applyQueries).length > 0 ? { queries: applyQueries } : {},
+      state: applyState,
+      queries: applyQueries,
+      error: null,
+      result: null,
     };
   }
   public getConfig(): FnsExternalConfig {
     return {
-      checksum: this._ver,
-      definitions: this._definitions,
+      checksum: this.version,
+      definitions: this.definitions,
     };
   }
   createFunction(
@@ -539,12 +466,11 @@ export class Fns {
       schema?: Schema;
     },
     fn: FnsFunction,
-  ): void {
+  ): Definition {
     const states: Record<string, unknown> = {};
     const queries: Set<string> = new Set();
     const signals: Set<string> = new Set();
     const remotes: Set<string> = new Set();
-
     try {
       // fake interface to collect all informations
       const output = fn({
@@ -557,13 +483,7 @@ export class Fns {
         useState(name: string, initial) {
           states[name] = initial;
           return [() => initial, () => {}];
-        },
-        useFunctions(names: string[]) {
-          for (let i = 0; i < names.length; i++) {
-            remotes.add(names[i]);
-          }
-          return {};
-        },
+        }
       });
       assertExists(output, "must return a function");
       assert(typeof output === "function", "must return a function");
@@ -572,7 +492,7 @@ export class Fns {
         `Failed to create function ${name}:${version} with message: ${e.message}`,
       );
     }
-    this._definitions.push({
+    const definition: Definition = {
       name,
       version,
       fn,
@@ -581,12 +501,16 @@ export class Fns {
       queries: Array.from(queries),
       signals: Array.from(signals),
       schema: schema ?? {},
-    });
-    this._ver = xxHash32(
-      this._definitions
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((w) => (`${w.name}:${w.version}`))
-        .join(";"),
+    };
+    return definition;
+  }
+  registerFunctions(...definitions: Definition[]): void {
+    for (let i = 0; i < definitions.length; i++) {
+      const definition = definitions[i];
+      this.definitions.set(definition.name, definition);
+    }
+    this.version = xxHash32(
+      JSON.stringify(Array.from(this.definitions.values())),
     );
   }
 }

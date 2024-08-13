@@ -1,8 +1,11 @@
 import { Fns } from "../libs/index.ts";
-import { serve } from "../libs/express.ts";
+import { serve } from "../libs/servers/express.ts";
 import express from "npm:express";
 
-const fns = new Fns({ dev: true });
+const fns = new Fns({
+  dev: true,
+  baseUrl: "https://api.fns.run",
+});
 fns.createFunction(
   { name: "WorkflowTest", version: 1 },
   () => {

@@ -1,4 +1,4 @@
-import { type Fns, FNS_SIGNATURE_HEADER } from "./index.ts";
+import { type Fns, FNS_SIGNATURE_HEADER } from "../index.ts";
 
 export function serve(
   client: Fns,

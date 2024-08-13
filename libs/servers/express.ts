@@ -1,5 +1,5 @@
 import type { Request, Response } from "npm:express@4.19.2";
-import { type Fns, FNS_SIGNATURE_HEADER } from "./index.ts";
+import { type Fns, FNS_SIGNATURE_HEADER } from "../index.ts";
 
 export function serve(
   client: Fns,
@@ -16,6 +16,7 @@ export function serve(
       const result = await client.onHandler(event, abortController.signal);
       return res.json(result);
     } catch (e) {
+      console.error(e);
       return res.status(400).send(`Internal Server Error: ${e.message}`);
     }
   };
