@@ -1,8 +1,16 @@
-import { type Fns, FNS_SIGNATURE_HEADER } from "../index.ts";
-
+import {
+  type Fns,
+  FNS_SIGNATURE_HEADER,
+  type FnsDefinition,
+} from "../index.ts";
+type ServeParams = {
+  client: Fns;
+  functions: Array<FnsDefinition>;
+};
 export function serve(
-  client: Fns,
+  { client, functions }: ServeParams,
 ): (req: Request) => Promise<unknown> {
+  client.registerFunctions(functions);
   return async (req: Request) => {
     if (req.method === "GET") {
       return new Response(JSON.stringify(client.getConfig()), {

@@ -50,7 +50,7 @@ export type FnsFunction = (params: FnsFunctionParams) => (execution: {
     data: unknown;
   };
   step: {
-    checkpoint(): Promise<boolean>;
+    checkpoint(): void;
     run<T = unknown>(id: string, step: () => T | Promise<T>): Promise<T>;
     condition(
       id: string,
@@ -59,11 +59,11 @@ export type FnsFunction = (params: FnsFunctionParams) => (execution: {
     ): Promise<boolean>;
     sleep(id: string, timeout: string | number): Promise<void>;
     sleepUntil(id: string, until: Date | string): Promise<void>;
-    repeat(
+    /*repeat(
       id: string,
       cron: string | { every?: string | number; times?: number },
       cb: (idx: number) => undefined | boolean | Promise<undefined | boolean>,
-    ): Promise<void>;
+    ): Promise<void>;*/
     lock(
       id: string,
       keys: string[],

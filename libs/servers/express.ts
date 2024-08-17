@@ -1,9 +1,17 @@
 import type { Request, Response } from "npm:express@4.19.2";
-import { type Fns, FNS_SIGNATURE_HEADER } from "../index.ts";
-
+import {
+  type Fns,
+  FNS_SIGNATURE_HEADER,
+  type FnsDefinition,
+} from "../index.ts";
+type ServeParams = {
+  client: Fns;
+  functions: Array<FnsDefinition>;
+};
 export function serve(
-  client: Fns,
+  { client, functions }: ServeParams,
 ): (req: Request, res: Response) => Promise<unknown> {
+  client.registerFunctions(functions);
   return async (req: Request, res: Response) => {
     if (req.method === "GET") return res.json(client.getConfig());
     const abortController = new AbortController();

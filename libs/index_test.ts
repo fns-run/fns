@@ -21,7 +21,7 @@ function buildInstance(name: string, data?: unknown): FnsRequestParams {
 }
 Deno.test("DefineFirstNameAndLastName", async (t) => {
   const fns = new Fns({ dev: true, baseUrl: "none" });
-  fns.registerFunctions(fns.createFunction(
+  const defineWorkflow = fns.createFunction(
     { name: "DefineFirstNameAndLastName", version: 1 },
     () => async ({ step, ctx }) => {
       const data = ctx.data as { prefix: string };
@@ -35,7 +35,8 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
       });
       return `Hello ${data.prefix} ${firstName} ${lastName}`;
     },
-  ));
+  );
+  fns.registerFunctions([defineWorkflow]);
 
   const initial = buildInstance("DefineFirstNameAndLastName", { prefix: "Mr" });
   const abortSignal = new AbortController().signal;
@@ -178,7 +179,7 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
 });
 Deno.test("LockerToUnlock", async (t) => {
   const fns = new Fns({ dev: true, baseUrl: "none" });
-  fns.registerFunctions(fns.createFunction(
+  const lockerWorkflow = fns.createFunction(
     { name: "LockerToUnlock", version: 1 },
     ({ useSignal, useQuery, useState }) => {
       const [locked, setLocked] = useState<boolean>("isLocked", true);
@@ -193,7 +194,9 @@ Deno.test("LockerToUnlock", async (t) => {
         return "unlocked";
       };
     },
-  ));
+  );
+  fns.registerFunctions([lockerWorkflow]);
+
   const initial = buildInstance("LockerToUnlock", { isLocked: true });
   const abortSignal = new AbortController().signal;
   await t.step("init condition", async () => {
@@ -268,13 +271,14 @@ Deno.test("LockerToUnlock", async (t) => {
 });
 Deno.test("CorrectConstructEvent", async (t) => {
   const fns = new Fns({ signingKey: "Hello world", baseUrl: "none" });
-  fns.registerFunctions(
-    fns.createFunction({ name: "test", version: 1 }, () => async ({ step }) => {
+  const testWorkflow = fns.createFunction(
+    { name: "test", version: 1 },
+    () => async ({ step }) => {
       await step.sleep("wait-10s", "10s");
       return "End!";
-    }),
+    },
   );
-
+  fns.registerFunctions([testWorkflow]);
   const initial = buildInstance("test", null);
   const initialRaw = JSON.stringify(initial);
   await t.step("constructEvent with valid signature", async () => {
@@ -289,7 +293,7 @@ Deno.test("CorrectConstructEvent", async (t) => {
 });
 Deno.test("EfficientStateManagement", async (t) => {
   const fns = new Fns({ dev: true, baseUrl: "none" });
-  fns.registerFunctions(fns.createFunction(
+  const efficientStateWorkflow = fns.createFunction(
     { name: "EfficientStateManagement", version: 1 },
     ({ useState }) => {
       const [counter, setCounter] = useState<number>("counter", 0);
@@ -303,7 +307,9 @@ Deno.test("EfficientStateManagement", async (t) => {
         return counter();
       };
     },
-  ));
+  );
+  fns.registerFunctions([efficientStateWorkflow]);
+
   const initial = buildInstance("EfficientStateManagement", null);
   const abortSignal = new AbortController().signal;
   await t.step("init state", async () => {

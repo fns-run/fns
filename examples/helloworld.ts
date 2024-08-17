@@ -6,7 +6,7 @@ const fns = new Fns({
   dev: true,
   baseUrl: "https://api.fns.run",
 });
-fns.createFunction(
+const workflowtest = fns.createFunction(
   { name: "WorkflowTest", version: 1 },
   () => {
     return async ({ step }) => {
@@ -21,7 +21,7 @@ fns.createFunction(
     };
   },
 );
-fns.createFunction(
+const realapitest = fns.createFunction(
   { name: "helloworld", version: 1 },
   ({ useState, useSignal }) => {
     const [name, setName] = useState<string>("name", "John Travolta");
@@ -44,17 +44,16 @@ fns.createFunction(
             .then((res) => res.name),
       );
 
-      await step.condition(
-        "wait-until-name-is-good",
-        () => name() === `${firstName} ${lastName}`,
-      );
-
       return `Hello ${firstName} ${lastName}`;
     };
   },
 );
 const app = express();
-app.use("/api-fns", express.raw({ type: "application/json" }), serve(fns));
+app.use(
+  "/api-fns",
+  express.raw({ type: "application/json" }),
+  serve({ client: fns, functions: [workflowtest, realapitest] }),
+);
 app.use(express.json());
 app.get("/", (_, res) => res.json({ message: "Hello World" }));
 app.listen(3100, () => console.log("Server running on port 3100"));

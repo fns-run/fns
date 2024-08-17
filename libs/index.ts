@@ -13,7 +13,7 @@ import type {
   StateGetter,
   StepType,
 } from "./types.ts";
-import { block, execute } from "./helper.ts";
+import { block } from "./helper.ts";
 import { xxHash32 } from "./xxhash32.ts";
 import {
   InvalidSignatureError,
@@ -29,7 +29,7 @@ import { StepsClient } from "./clients/steps.ts";
 import { RunsClient } from "./clients/runs.ts";
 import { ErrorsClient } from "./clients/errors.ts";
 
-let performanceCounter: () => number = performance.now;
+let performanceCounter: () => number = () => performance.now();
 export function setPerformanceCounter(cb: () => number): void {
   performanceCounter = cb;
 }
@@ -38,10 +38,10 @@ export const FNS_SIGNATURE_HEADER = "x-fns-signature";
 
 interface FnsExternalConfig {
   checksum: number;
-  definitions: Map<string, Definition>;
+  definitions: Map<string, FnsDefinition>;
 }
 
-type Definition = {
+export type FnsDefinition = {
   name: string;
   fn: FnsFunction;
   version: number;
@@ -53,7 +53,7 @@ type Definition = {
 };
 export class Fns {
   private config: FnsOptions;
-  private definitions: Map<string, Definition> = new Map();
+  private definitions: Map<string, FnsDefinition> = new Map();
   private version: number = 0;
   executions: ExecutionsClient;
   queries: QueriesClient;
@@ -106,6 +106,7 @@ export class Fns {
     if (abortSignal.aborted) throw new Error("Aborted");
     let init = false;
     let tick = 0;
+    let nPending = 0;
     const steps = event.steps;
     const state: Record<string, unknown> = event.state ?? {};
     const stateChanges = new Set<string>();
@@ -115,6 +116,7 @@ export class Fns {
     const queries: Query[] = [];
     const mutexes = new Set<string>();
 
+    const isReplay = () => steps.length > tick;
     function unrollSignals() {
       while (steps[tick]?.type === "signal") {
         const next = steps[tick++];
@@ -127,8 +129,6 @@ export class Fns {
         cb(next.result);
       }
     }
-    const isReplay = () => steps.length > tick;
-    let currentStateScope: Query | null = null;
     async function memo<T = unknown>(
       id: string,
       type: StepType,
@@ -152,7 +152,7 @@ export class Fns {
       unrollSignals();
       if (!step) {
         mutations.push({ id, type, params, status: "pending" });
-        return await block<T>();
+        return block<T>();
       }
       assert(step.id === id, `Invalid step id ${step.id} expected ${id}`);
       if (step.status === "completed") {
@@ -162,7 +162,8 @@ export class Fns {
       const start = performanceCounter();
       let isSetted = false;
       let retn: T = null!;
-      await write((result) => {
+      nPending++;
+      await Promise.resolve(write((result) => {
         mutations.push({
           id,
           result,
@@ -171,24 +172,26 @@ export class Fns {
         });
         retn = result as T;
         isSetted = true;
+      })).finally(() => {
+        nPending--;
       });
-      if (!isSetted) return await block<T>();
+      if (!isSetted) return block<T>();
       complete(retn);
       return retn as T;
     }
-    async function run<T = unknown>(
+    function run<T = unknown>(
       id: string,
       cb: () => T | Promise<T>,
     ): Promise<T> {
       assertExists(id, "id is required");
       assertExists(cb, "cb is required");
       assert(typeof cb === "function", "cb must be a function");
-      return await memo<T>(id, "run", null, async (done) => {
-        const res = await Promise.resolve(cb());
+      return memo<T>(id, "run", null, async (done) => {
+        const res = await cb();
         done(res);
       });
     }
-    async function sleep(id: string, timeout: string | number): Promise<void> {
+    function sleep(id: string, timeout: string | number): Promise<void> {
       assertExists(id, "id is required");
       assertExists(timeout, "timeout is required");
       assert(
@@ -198,9 +201,9 @@ export class Fns {
       const params: Params = {
         timeout: typeof timeout === "string" ? ms(timeout) as number : timeout,
       };
-      return await memo<void>(id, "sleep", params, () => {});
+      return memo<void>(id, "sleep", params, () => {});
     }
-    async function sleepUntil(id: string, until: Date | string): Promise<void> {
+    function sleepUntil(id: string, until: Date | string): Promise<void> {
       assertExists(id, "id is required");
       assertExists(until, "until is required");
       assert(
@@ -210,9 +213,9 @@ export class Fns {
       const params: Params = {
         until: typeof until === "string" ? until : until.toISOString(),
       };
-      return await memo<void>(id, "sleep", params, () => {});
+      return memo<void>(id, "sleep", params, () => {});
     }
-    async function condition(
+    function condition(
       id: string,
       cb: () => boolean,
       timeout?: string | number,
@@ -232,14 +235,14 @@ export class Fns {
             : timeout,
         }
         : null;
-      return await memo<boolean>(
+      return memo<boolean>(
         id,
         "condition",
         params,
         (write) => cb() && write(true),
       );
     }
-    async function lock(
+    function lock(
       id: string,
       keys: string[],
       timeout?: string | number,
@@ -259,7 +262,7 @@ export class Fns {
           ? { timeout: typeof timeout === "string" ? ms(timeout) : timeout }
           : {},
       };
-      return await memo<boolean>(
+      return memo<boolean>(
         id,
         "lock",
         params,
@@ -272,7 +275,7 @@ export class Fns {
         },
       );
     }
-    async function unlock(id: string, keys?: string[]): Promise<void> {
+    function unlock(id: string, keys?: string[]): Promise<void> {
       assertExists(id, "id is required");
       assert(
         keys === undefined || (keys instanceof Array && keys.length > 0),
@@ -286,20 +289,13 @@ export class Fns {
         for (let i = 0; i < keys.length; i++) mutexes.delete(keys[i]);
       };
       const params: Params = keys ? { keys } : null;
-      return await memo<void>(
+      return memo<void>(
         id,
         "unlock",
         params,
         () => {},
         cb,
       );
-    }
-    function repeat(
-      _id: string,
-      _cron: string | { every: string | number; times?: number },
-      _cb: (idx: number) => undefined | boolean | Promise<undefined | boolean>,
-    ): Promise<void> {
-      throw new NonRetriableError("repeat not implemented");
     }
     function useState<T = unknown>(
       id: string,
@@ -328,7 +324,6 @@ export class Fns {
         stateChanges.add(id);
       }
       function GetState() {
-        console.log(currentStateScope);
         return state[id] as T;
       }
       GetState.id = id;
@@ -366,47 +361,64 @@ export class Fns {
       };
       queries.push(row);
     }
-    const bootstrap = await fn({ useSignal, useQuery, useState });
-    assertExists(bootstrap, "must return a function");
-    assert(typeof bootstrap === "function", "must return a function");
+    const timeline = await fn({ useSignal, useQuery, useState });
+    assertExists(timeline, "must return a function");
+    assert(typeof timeline === "function", "must return a function");
     unrollSignals();
     init = true;
     let isCompleted, result;
+    let timeoutRef: number | null = null;
     try {
-      [isCompleted, result] = await execute(bootstrap({
-        abortSignal,
-        ctx: {
-          id: event.id,
-          run_id: event.run_id,
-          data: event.data,
-        },
-        step: {
-          run,
-          sleep,
-          sleepUntil,
-          condition,
-          lock,
-          unlock,
-          repeat,
-          checkpoint: function (): Promise<boolean> {
-            throw new Error("Function not implemented.");
+      [isCompleted, result] = await Promise.race([
+        timeline({
+          abortSignal,
+          ctx: {
+            id: event.id,
+            run_id: event.run_id,
+            data: event.data,
           },
-        },
-        logger: {
-          info(..._args: unknown[]) {
-            throw new Error("Function not implemented.");
+          step: {
+            run,
+            sleep,
+            sleepUntil,
+            condition,
+            lock,
+            unlock,
+            checkpoint: function () {
+              if (isReplay()) return;
+            },
           },
-          warn(..._args: unknown[]) {
-            throw new Error("Function not implemented.");
+          logger: {
+            info(..._args: unknown[]) {
+              throw new Error("Function not implemented.");
+            },
+            warn(..._args: unknown[]) {
+              throw new Error("Function not implemented.");
+            },
+            error(..._args: unknown[]) {
+              throw new Error("Function not implemented.");
+            },
+            debug(..._args: unknown[]) {
+              throw new Error("Function not implemented.");
+            },
           },
-          error(..._args: unknown[]) {
-            throw new Error("Function not implemented.");
-          },
-          debug(..._args: unknown[]) {
-            throw new Error("Function not implemented.");
-          },
-        },
-      }));
+        }).then((data: unknown) => [true, data]),
+        new Promise<[false, null]>((resolve) => {
+          let i = 0;
+          const iterate = () => {
+            timeoutRef = setTimeout(() => {
+              i++;
+              if (nPending === 0) {
+                return resolve([false, null]);
+              }
+              iterate();
+            });
+          };
+          iterate();
+        }),
+      ]).finally(() => {
+        if (timeoutRef) clearTimeout(timeoutRef);
+      });
     } catch (e) {
       const retryable = !(e instanceof NonRetriableError);
       return {
@@ -423,9 +435,12 @@ export class Fns {
         result: null,
       };
     }
+    let _currentState: Query | null = null;
+
     const applyState = Object.fromEntries(
       Array.from(stateChanges).map((id) => [id, state[id]]),
     );
+
     const applyQueries = Object.fromEntries(
       queries
         .filter((q) =>
@@ -433,12 +448,13 @@ export class Fns {
           q.dependencies.some((dep) => stateChanges.has(dep))
         )
         .map((q) => {
-          currentStateScope = q;
+          _currentState = q;
           const res = q.cb();
-          currentStateScope = null;
+          _currentState = null;
           return [q.name, res];
         }),
     );
+
     if (isCompleted) {
       return {
         status: "completed",
@@ -471,7 +487,7 @@ export class Fns {
       schema?: Schema;
     },
     fn: FnsFunction,
-  ): Definition {
+  ): FnsDefinition {
     const states: Record<string, unknown> = {};
     const queries: Set<string> = new Set();
     const signals: Set<string> = new Set();
@@ -497,7 +513,7 @@ export class Fns {
         `Failed to create function ${name}:${version} with message: ${e.message}`,
       );
     }
-    const definition: Definition = {
+    const definition: FnsDefinition = {
       name,
       version,
       fn,
@@ -509,7 +525,7 @@ export class Fns {
     };
     return definition;
   }
-  registerFunctions(...definitions: Definition[]): void {
+  registerFunctions(definitions: FnsDefinition[]): void {
     for (let i = 0; i < definitions.length; i++) {
       const definition = definitions[i];
       this.definitions.set(definition.name, definition);
@@ -519,4 +535,3 @@ export class Fns {
     );
   }
 }
-export default { Fns };
