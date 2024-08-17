@@ -24,7 +24,7 @@ const workflowtest = fns.createFunction(
 const realapitest = fns.createFunction(
   { name: "helloworld", version: 1 },
   ({ useState, useSignal }) => {
-    const [name, setName] = useState<string>("name", "John Travolta");
+    const [_, setName] = useState<string>("name", "John Travolta");
     useSignal<string>("setName", (newName) => setName(newName));
 
     return async ({ step }) => {
