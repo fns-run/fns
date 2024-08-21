@@ -7,7 +7,6 @@ export interface FnsOptions {
 export interface Query {
   name: string;
   cb: () => unknown;
-  dependencies: string[];
 }
 export type Callback<T = unknown> = () => T;
 export interface StateGetter<T = unknown> extends Callback<T> {
@@ -43,6 +42,10 @@ export interface Logger {
   error(...args: unknown[]): void;
   debug(...args: unknown[]): void;
 }
+export type FnsLog = {
+  level: "info" | "warn" | "error" | "debug";
+  message: string;
+};
 export type FnsFunction = (params: FnsFunctionParams) => (execution: {
   ctx: {
     id: string;
@@ -59,11 +62,10 @@ export type FnsFunction = (params: FnsFunctionParams) => (execution: {
     ): Promise<boolean>;
     sleep(id: string, timeout: string | number): Promise<void>;
     sleepUntil(id: string, until: Date | string): Promise<void>;
-    /*repeat(
+    repeat(
       id: string,
-      cron: string | { every?: string | number; times?: number },
-      cb: (idx: number) => undefined | boolean | Promise<undefined | boolean>,
-    ): Promise<void>;*/
+      cron: { every: string | number; times?: number },
+    ): AsyncGenerator<number, void, unknown>;
     lock(
       id: string,
       keys: string[],
@@ -136,6 +138,7 @@ export type FnsResponse = {
     retryable: boolean;
   } | null;
   result: unknown;
+  logs: FnsLog[];
 };
 
 export type Schema = {

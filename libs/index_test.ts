@@ -23,12 +23,13 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
   const fns = new Fns({ dev: true, baseUrl: "none" });
   const defineWorkflow = fns.createFunction(
     { name: "DefineFirstNameAndLastName", version: 1 },
-    () => async ({ step, ctx }) => {
+    () => async ({ step, ctx, logger }) => {
       const data = ctx.data as { prefix: string };
       assert(data.prefix, "prefix is required");
       const firstName = await step.run("define-firstname", () => {
         return "lucas";
       });
+      logger.info("First name defined", { firstName });
       await step.sleep("wait-10s", "10s");
       const lastName = await step.run("define-lastname", () => {
         return "fernandes";
@@ -60,6 +61,7 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
       state: {},
       error: null,
       result: null,
+      logs: [],
     });
   });
   await t.step("memo define-firstname", async () => {
@@ -98,6 +100,12 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
       state: {},
       error: null,
       result: null,
+      logs: [
+        {
+          level: "info",
+          message: "First name defined [object Object]",
+        },
+      ],
     });
   });
   await t.step("define lastname", async () => {
@@ -135,6 +143,7 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
       state: {},
       error: null,
       result: null,
+      logs: [],
     });
   });
   await t.step("memo lastname", async () => {
@@ -174,6 +183,7 @@ Deno.test("DefineFirstNameAndLastName", async (t) => {
       error: null,
       queries: {},
       state: {},
+      logs: [],
     });
   });
 });
@@ -223,6 +233,7 @@ Deno.test("LockerToUnlock", async (t) => {
       },
       result: null,
       error: null,
+      logs: [],
     });
   });
   await t.step("signal unlocking", async () => {
@@ -266,6 +277,7 @@ Deno.test("LockerToUnlock", async (t) => {
         isLocked: false,
       },
       error: null,
+      logs: [],
     });
   });
 });
@@ -334,6 +346,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       },
       result: null,
       error: null,
+      logs: [],
     });
   });
   await t.step("next state 1", async () => {
@@ -366,6 +379,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       state: {},
       result: null,
       error: null,
+      logs: [],
     });
   });
   await t.step("next state 2", async () => {
@@ -405,6 +419,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       state: {},
       result: null,
       error: null,
+      logs: [],
     });
   });
   await t.step("next state 3", async () => {
@@ -451,6 +466,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       },
       result: null,
       error: null,
+      logs: [],
     });
   });
   await t.step("next state 4", async () => {
@@ -502,6 +518,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       queries: {},
       state: {},
       error: null,
+      logs: [],
     });
   });
   await t.step("next state 5", async () => {
@@ -555,6 +572,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       queries: {},
       state: {},
       error: null,
+      logs: [],
     });
   });
 });

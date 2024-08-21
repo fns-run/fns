@@ -3,6 +3,7 @@ import { ms } from "./ms.ts";
 import { verify } from "./signature.ts";
 import type {
   FnsFunction,
+  FnsLog,
   FnsOptions,
   FnsRequestParams,
   FnsResponse,
@@ -107,6 +108,8 @@ export class Fns {
     let init = false;
     let tick = 0;
     let nPending = 0;
+    const logs: Array<FnsLog> = [];
+
     const steps = event.steps;
     const state: Record<string, unknown> = event.state ?? {};
     const stateChanges = new Set<string>();
@@ -117,6 +120,45 @@ export class Fns {
     const mutexes = new Set<string>();
 
     const isReplay = () => steps.length > tick;
+
+    const appendLog = (level: FnsLog["level"], message: string[]) => {
+      if (isReplay()) return;
+      assert(
+        level === "info" || level === "warn" || level === "error" ||
+          level === "debug",
+        "Invalid log level",
+      );
+      const maxLength = 2 * 1024;
+      let finalMessage = message.join(" ");
+      finalMessage = finalMessage.length > maxLength
+        ? finalMessage.substring(0, maxLength - 3) + "..."
+        : finalMessage;
+
+      logs.push({
+        level,
+        message: finalMessage,
+      });
+      if (logs.length > 100) {
+        logs.shift();
+        if (this.config.dev) console.warn("Logs limit reached, dropping logs");
+      }
+      if (this.config.dev) {
+        switch (level) {
+          case "info":
+            console.info(...message);
+            break;
+          case "warn":
+            console.warn(...message);
+            break;
+          case "error":
+            console.error(...message);
+            break;
+          case "debug":
+            console.debug(...message);
+            break;
+        }
+      }
+    };
     function unrollSignals() {
       while (steps[tick]?.type === "signal") {
         const next = steps[tick++];
@@ -297,6 +339,20 @@ export class Fns {
         cb,
       );
     }
+    async function* repeat(
+      id: string,
+      cron: { every: string | number; times?: number },
+    ): AsyncGenerator<number, void, unknown> {
+      let count = 0;
+      const times = (cron.times === undefined || isNaN(cron.times))
+        ? Infinity
+        : cron.times;
+      while (true) {
+        yield count++;
+        if (count >= times) return;
+        await sleep(`${id}-${count}`, cron.every);
+      }
+    }
     function useState<T = unknown>(
       id: string,
       initial: T,
@@ -341,14 +397,11 @@ export class Fns {
     function useQuery<T = unknown>(
       query: string,
       cb: () => T,
-      dependencies: StateGetter[] = [],
     ) {
       assertExists(query, "query is required");
       assertExists(cb, "cb is required");
-      assertExists(dependencies, "dependencies is required");
       assert(typeof query === "string", "query must be a string");
       assert(typeof cb === "function", "cb must be a function");
-      assert(dependencies instanceof Array, "dependencies must be an array");
       assert(!init, "useQuery must be called at initialization");
       assert(
         !queries.find((q) => q.name === query),
@@ -357,7 +410,6 @@ export class Fns {
       const row: Query = {
         name: query,
         cb,
-        dependencies: dependencies.map((dep) => dep.id),
       };
       queries.push(row);
     }
@@ -384,22 +436,23 @@ export class Fns {
             condition,
             lock,
             unlock,
+            repeat,
             checkpoint: function () {
               if (isReplay()) return;
             },
           },
           logger: {
-            info(..._args: unknown[]) {
-              throw new Error("Function not implemented.");
+            info(...args: unknown[]) {
+              appendLog("info", args.map((a) => String(a)));
             },
-            warn(..._args: unknown[]) {
-              throw new Error("Function not implemented.");
+            warn(...args: unknown[]) {
+              appendLog("warn", args.map((a) => String(a)));
             },
-            error(..._args: unknown[]) {
-              throw new Error("Function not implemented.");
+            error(...args: unknown[]) {
+              appendLog("error", args.map((a) => String(a)));
             },
-            debug(..._args: unknown[]) {
-              throw new Error("Function not implemented.");
+            debug(...args: unknown[]) {
+              appendLog("debug", args.map((a) => String(a)));
             },
           },
         }).then((data: unknown) => [true, data]),
@@ -417,7 +470,7 @@ export class Fns {
           iterate();
         }),
       ]).finally(() => {
-        if (timeoutRef) clearTimeout(timeoutRef);
+        if (timeoutRef !== null) clearTimeout(timeoutRef);
       });
     } catch (e) {
       const retryable = !(e instanceof NonRetriableError);
@@ -433,9 +486,10 @@ export class Fns {
         queries: {},
         state: {},
         result: null,
+        logs: [],
       };
     }
-    let _currentState: Query | null = null;
+    const detectedStates: Set<string> = new Set();
 
     const applyState = Object.fromEntries(
       Array.from(stateChanges).map((id) => [id, state[id]]),
@@ -443,16 +497,16 @@ export class Fns {
 
     const applyQueries = Object.fromEntries(
       queries
-        .filter((q) =>
-          q.dependencies.length == 0 ||
-          q.dependencies.some((dep) => stateChanges.has(dep))
-        )
         .map((q) => {
-          _currentState = q;
+          detectedStates.clear();
           const res = q.cb();
-          _currentState = null;
-          return [q.name, res];
-        }),
+
+          const hasRelevantStateChanges = detectedStates.size === 0 ||
+            [...detectedStates].some((dep) => stateChanges.has(dep));
+
+          return hasRelevantStateChanges ? [q.name, res] : null!;
+        })
+        .filter(Boolean),
     );
 
     if (isCompleted) {
@@ -463,6 +517,7 @@ export class Fns {
         queries: applyQueries,
         state: applyState,
         error: null,
+        logs,
       };
     }
     return {
@@ -472,6 +527,7 @@ export class Fns {
       queries: applyQueries,
       error: null,
       result: null,
+      logs,
     };
   }
   public getConfig(): FnsExternalConfig {

@@ -6,13 +6,63 @@ const fns = new Fns({
   dev: true,
   baseUrl: "https://api.fns.run",
 });
+
 const workflowtest = fns.createFunction(
   { name: "WorkflowTest", version: 1 },
+  ({ useSignal }) => {
+    let name: string = "";
+    useSignal<string>("setName", (newName) => name = newName);
+    return async ({ step, logger }) => {
+      const firstName = await step.run(
+        "Set Firstname = Lucas",
+        () => "lucas",
+      );
+      for await (
+        const counter of step.repeat("repeat-10-times", {
+          every: "1s",
+          times: 10,
+        })
+      ) {
+        logger.info(`Counter: ${counter}`);
+      }
+      await step.sleep("Wait 5s then finish", "5s");
+      const lastName = await step.run(
+        "Set Lastname = Fernandes",
+        () =>
+          fetch("https://api.namefake.com/")
+            .then((res) => res.json())
+            .then((res) => res.name),
+      );
+      logger.info("Setup", firstName, "=", lastName);
+      if (
+        await step.condition(
+          "Check if guess is correct",
+          () => name === firstName,
+        )
+      ) {
+        logger.info("Guess is correct");
+      } else {
+        logger.info("Guess is incorrect");
+      }
+      return `Hello ${firstName} ${lastName}`;
+    };
+  },
+);
+const workflowtest2 = fns.createFunction(
+  { name: "WorkflowTest2", version: 1 },
   () => {
-    return async ({ step }) => {
+    return async ({ step, logger }) => {
       const firstName = await step.run("Set Firstname = Lucas", () => {
         return "lucas";
       });
+      for await (
+        const counter of step.repeat("repeat-10-times", {
+          every: "1s",
+          times: 100,
+        })
+      ) {
+        logger.info(`Counter: ${counter}`);
+      }
       await step.sleep("Wait 10s then finish", "5s");
       const lastName = await step.run("Set Lastname = Fernandes", () => {
         return "fernandes";

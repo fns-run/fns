@@ -16,3 +16,11 @@
   - retry
   - create execution id
   - signal wait
+
+
+
+
+
+// if (model.status === "completed" || model.status === "failed") return;
+// don't forget to do strict json validation and verify timeout > 0 or valid iso date format for until, etc
+// if one interaction do a wrong mutation everything is STOP;
