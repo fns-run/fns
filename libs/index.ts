@@ -491,9 +491,11 @@ export class Fns {
     }
     const detectedStates: Set<string> = new Set();
 
-    const applyState = Object.fromEntries(
-      Array.from(stateChanges).map((id) => [id, state[id]]),
-    );
+    const applyState = event.snapshot
+      ? Object.fromEntries(
+        Array.from(stateChanges).map((id) => [id, state[id]]),
+      )
+      : {};
 
     const applyQueries = Object.fromEntries(
       queries

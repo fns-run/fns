@@ -228,9 +228,7 @@ Deno.test("LockerToUnlock", async (t) => {
       queries: {
         isLocked: true,
       },
-      state: {
-        isLocked: true,
-      },
+      state: {},
       result: null,
       error: null,
       logs: [],
@@ -257,6 +255,7 @@ Deno.test("LockerToUnlock", async (t) => {
       ],
       version: 1,
       checksum: fns.getConfig().checksum,
+      snapshot: true
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
@@ -329,6 +328,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       ...initial,
       version: 1,
       checksum: fns.getConfig().checksum,
+      snapshot: true
     }, abortSignal);
     assertEquals(result, {
       status: "incomplete",
@@ -363,6 +363,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       ],
       version: 1,
       checksum: fns.getConfig().checksum,
+      snapshot: true
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
@@ -403,6 +404,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       ],
       version: 1,
       checksum: fns.getConfig().checksum,
+      snapshot: true
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
@@ -450,6 +452,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       ],
       version: 1,
       checksum: fns.getConfig().checksum,
+      snapshot: true
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
@@ -504,6 +507,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       ],
       version: 1,
       checksum: fns.getConfig().checksum,
+      snapshot: true
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {
@@ -563,6 +567,7 @@ Deno.test("EfficientStateManagement", async (t) => {
       ],
       version: 1,
       checksum: fns.getConfig().checksum,
+      snapshot: true
     };
     const result = await fns.onHandler(params, abortSignal);
     assertEquals(result, {

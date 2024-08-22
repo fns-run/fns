@@ -1,8 +1,8 @@
 import {
   BaseClient,
   type FnsConfig,
-  type PaginationParams,
   type Pagination,
+  type PaginationParams,
 } from "./client.ts";
 
 export type Run = {

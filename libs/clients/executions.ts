@@ -1,8 +1,8 @@
 import {
   BaseClient,
   type FnsConfig,
-  type PaginationParams,
   type Pagination,
+  type PaginationParams,
 } from "./client.ts";
 
 export type Execution = {
@@ -64,10 +64,10 @@ export class ExecutionsClient extends BaseClient {
       if (params.limit) {
         url.searchParams.set("limit", String(params.limit));
       }
-      if(params.status) {
+      if (params.status) {
         url.searchParams.set("status", params.status);
       }
-      if(params.name) {
+      if (params.name) {
         url.searchParams.set("name", params.name);
       }
       if (params.cursor) {

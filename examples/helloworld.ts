@@ -102,7 +102,7 @@ const app = express();
 app.use(
   "/api-fns",
   express.raw({ type: "application/json" }),
-  serve({ client: fns, functions: [workflowtest, realapitest] }),
+  serve({ client: fns, functions: [workflowtest, workflowtest2, realapitest] }),
 );
 app.use(express.json());
 app.get("/", (_, res) => res.json({ message: "Hello World" }));
