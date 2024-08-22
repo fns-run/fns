@@ -459,13 +459,13 @@ export class Fns {
         new Promise<[false, null]>((resolve) => {
           let i = 0;
           const iterate = () => {
-            timeoutRef = setTimeout(() => {
+            timeoutRef = Number(setTimeout(() => {
               i++;
               if (nPending === 0) {
                 return resolve([false, null]);
               }
               iterate();
-            });
+            }));
           };
           iterate();
         }),
