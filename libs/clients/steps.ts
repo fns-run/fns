@@ -2,27 +2,27 @@ import {
   BaseClient,
   type FnsConfig,
   type PaginationParams,
-  type Pagined,
+  type Pagination,
 } from "./client.ts";
 
-type Query = {
-  name: string;
-  size: number;
-  version: number;
-  updated_at: string;
-};
-type QueryValue<T> = {
-  value: T;
-  timestamp: string;
-  version: number;
-
-  updated_at: string;
-};
-type QueryRetrieveParams = {
+export type Step = {
+  tenant_id: string;
+  execution_id: string;
   id: string;
-  query: string;
+  status: "pending" | "completed";
+  type: "run" | "sleep" | "condition" | "signal";
+  params: unknown;
+  elapsed: number | null;
+  result: null | { size: number };
+  is_expired: boolean;
+  created_at: string;
+  updated_at: string;
 };
-type QueryListParams = PaginationParams<{
+export type StepRetrieveParams = {
+  id: string;
+  execution_id: string;
+};
+export type StepListParams = PaginationParams<{
   execution_id: string;
 }>;
 
@@ -33,31 +33,30 @@ export class StepsClient extends BaseClient {
   /**
    * List all steps of an execution.
    * @example
-   * const queries = await fns.queries.list({ id: "..." })
+   * const steps = await fns.steps.list({ execution_id: "..." })
    */
-  list(params: QueryListParams): Promise<Pagined<Query>> {
+  list(params: StepListParams): Promise<Pagination<Step>> {
     const url = new URL(
-      `/api/v1/queries/${params.execution_id}`,
+      `/api/v1/steps/${params.execution_id}`,
       this.options.baseUrl,
     );
-    url.searchParams.set("limit", String(params.limit ?? 10));
-    if (params.ending_before) {
-      url.searchParams.set("ending_before", params.ending_before);
+    if (params.limit) {
+      url.searchParams.set("limit", String(params.limit));
     }
-    if (params.starting_after) {
-      url.searchParams.set("starting_after", params.starting_after);
+    if (params.cursor) {
+      url.searchParams.set("cursor", params.cursor);
     }
-    return this.request<Pagined<Query>>(url, "GET");
+    return this.request<Pagination<Step>>(url, "GET");
   }
 
   /**
    * Retrieve a specific query by its ID.
    * @example
-   * const value = await fns.queries.retrieve({ id: "...", query: "..." })
+   * const step = await fns.steps.retrieve({ execution_id: "..." })
    */
-  retrieve<T = unknown>(params: QueryRetrieveParams): Promise<QueryValue<T>> {
-    return this.request<QueryValue<T>>(
-      `/api/v1/queries/${params.id}/${params.query}`,
+  retrieve(params: StepRetrieveParams): Promise<Step> {
+    return this.request<Step>(
+      `/api/v1/steps/${params.execution_id}/${params.id}`,
       "GET",
     );
   }

@@ -2,10 +2,10 @@ import {
   BaseClient,
   type FnsConfig,
   type PaginationParams,
-  type Pagined,
+  type Pagination,
 } from "./client.ts";
 
-type Execution = {
+export type Execution = {
   id: string;
   name: string;
   data: { size: number } | null;
@@ -14,43 +14,39 @@ type Execution = {
   created_at: string;
   updated_at: string;
 };
-type ExecutionInvokeParams = {
+export type ExecutionInvokeParams = {
   id?: string;
   name: string;
   data: unknown;
   wait?: boolean;
   idempotencyKey?: string;
 };
-type ExecutionTriggerParams = {
+export type ExecutionTriggerParams = {
   id: string;
   signal: string;
   data?: unknown;
   idempotencyKey?: string;
 };
-type ExecutionAbortParams = {
+export type ExecutionAbortParams = {
   id: string;
 };
-type ExecutionPauseParams = {
-  id: string;
-  idempotencyKey?: string;
-};
-type ExecutionResumeParams = {
+export type ExecutionPauseParams = {
   id: string;
   idempotencyKey?: string;
 };
-type ExecutionResultParams = {
+export type ExecutionResumeParams = {
+  id: string;
+  idempotencyKey?: string;
+};
+export type ExecutionResultParams = {
   id: string;
 };
-type ExecutionDataParams = {
+export type ExecutionDataParams = {
   id: string;
 };
-type ExecutionListParams = PaginationParams<{
-  created?: {
-    gt?: string;
-    gte?: string;
-    lt?: string;
-    lte?: string;
-  };
+export type ExecutionListParams = PaginationParams<{
+  status?: "running" | "waiting" | "completed" | "failed" | "aborted";
+  name?: string;
 }>;
 
 export class ExecutionsClient extends BaseClient {
@@ -62,30 +58,23 @@ export class ExecutionsClient extends BaseClient {
    * @example
    * const executions = await fns.executions.list()
    */
-  list(params: ExecutionListParams): Promise<Pagined<Execution>> {
+  list(params?: ExecutionListParams): Promise<Pagination<Execution>> {
     const url = new URL("/api/v1/executions", this.options.baseUrl);
-    url.searchParams.set("limit", String(params.limit ?? 10));
-    if (params.ending_before) {
-      url.searchParams.set("ending_before", params.ending_before);
-    }
-    if (params.starting_after) {
-      url.searchParams.set("starting_after", params.starting_after);
-    }
-    if (params.created) {
-      if (params.created.gt) {
-        url.searchParams.set("created[gt]", params.created.gt);
+    if (params) {
+      if (params.limit) {
+        url.searchParams.set("limit", String(params.limit));
       }
-      if (params.created.gte) {
-        url.searchParams.set("created[gte]", params.created.gte);
+      if(params.status) {
+        url.searchParams.set("status", params.status);
       }
-      if (params.created.lt) {
-        url.searchParams.set("created[lt]", params.created.lt);
+      if(params.name) {
+        url.searchParams.set("name", params.name);
       }
-      if (params.created.lte) {
-        url.searchParams.set("created[lte]", params.created.lte);
+      if (params.cursor) {
+        url.searchParams.set("cursor", params.cursor);
       }
     }
-    return this.request<Pagined<Execution>>(url, "GET");
+    return this.request<Pagination<Execution>>(url, "GET");
   }
 
   /**

@@ -2,7 +2,7 @@ import {
   BaseClient,
   type FnsConfig,
   type PaginationParams,
-  type Pagined,
+  type Pagination,
 } from "./client.ts";
 
 type Error = {
@@ -26,18 +26,17 @@ export class ErrorsClient extends BaseClient {
    * @example
    * const errors = await fns.errors.list({ id: "..." })
    */
-  list(params: ErrorsListParams): Promise<Pagined<Error>> {
+  list(params: ErrorsListParams): Promise<Pagination<Error>> {
     const url = new URL(
       `/api/v1/errors/${params.execution_id}/${params.run_id}`,
       this.options.baseUrl,
     );
-    url.searchParams.set("limit", String(params.limit ?? 10));
-    if (params.ending_before) {
-      url.searchParams.set("ending_before", params.ending_before);
+    if (params.limit) {
+      url.searchParams.set("limit", String(params.limit));
     }
-    if (params.starting_after) {
-      url.searchParams.set("starting_after", params.starting_after);
+    if (params.cursor) {
+      url.searchParams.set("cursor", params.cursor);
     }
-    return this.request<Pagined<Error>>(url, "GET");
+    return this.request<Pagination<Error>>(url, "GET");
   }
 }

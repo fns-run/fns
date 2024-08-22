@@ -7,14 +7,13 @@ export type FnsConfig = {
   apiKey?: string;
   fetch?: typeof fetch;
 };
-export type Pagined<T> = {
-  data: T[];
+export type Pagination<T> = {
+  results: T[];
   hasMore: boolean;
   cursor: string;
 };
 export type PaginationParams<T> = T & {
-  ending_before?: string;
-  starting_after?: string;
+  cursor?: string;
   limit?: number;
 };
 export class BaseClient {

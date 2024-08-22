@@ -2,26 +2,22 @@ import {
   BaseClient,
   type FnsConfig,
   type PaginationParams,
-  type Pagined,
+  type Pagination,
 } from "./client.ts";
-type Query = {
-  name: string;
-  size: number;
-  version: number;
-  updated_at: string;
-};
-type QueryValue<T> = {
-  value: T;
-  timestamp: string;
-  version: number;
 
+export type Run = {
+  tenant_id: string;
+  execution_id: string;
+  id: string;
+  status: "running" | "completed" | "failed" | "aborted";
+  created_at: string;
   updated_at: string;
 };
-type QueryRetrieveParams = {
+export type RunRetrieveParams = {
   id: string;
-  query: string;
+  execution_id: string;
 };
-type QueryListParams = PaginationParams<{
+export type RunListParams = PaginationParams<{
   execution_id: string;
 }>;
 
@@ -30,46 +26,33 @@ export class RunsClient extends BaseClient {
     super(config);
   }
   /**
-   * List all queries of an execution.
+   * List all runs of an execution.
    * @example
-   * const queries = await fns.queries.list({ id: "..." })
+   * const runs = await fns.runs.list({ execution_id: "..." })
    */
-  list(params: QueryListParams): Promise<Pagined<Query>> {
+  list(params: RunListParams): Promise<Pagination<Run>> {
     const url = new URL(
-      `/api/v1/queries/${params.execution_id}`,
+      `/api/v1/runs/${params.execution_id}`,
       this.options.baseUrl,
     );
-    url.searchParams.set("limit", String(params.limit ?? 10));
-    if (params.ending_before) {
-      url.searchParams.set("ending_before", params.ending_before);
+    if (params.limit) {
+      url.searchParams.set("limit", String(params.limit));
     }
-    if (params.starting_after) {
-      url.searchParams.set("starting_after", params.starting_after);
+    if (params.cursor) {
+      url.searchParams.set("cursor", params.cursor);
     }
-    return this.request<Pagined<Query>>(url, "GET");
+    return this.request<Pagination<Run>>(url, "GET");
   }
 
   /**
-   * Retrieve a specific query by its ID.
+   * Retrieve a specific run by its ID.
    * @example
-   * const value = await fns.queries.retrieve({ id: "...", query: "..." })
+   * const value = await fns.runs.retrieve({ execution_id: "...", id: "..." })
    */
-  retrieve<T = unknown>(params: QueryRetrieveParams): Promise<QueryValue<T>> {
-    return this.request<QueryValue<T>>(
-      `/api/v1/queries/${params.id}/${params.query}`,
+  retrieve(params: RunRetrieveParams): Promise<Run> {
+    return this.request<Run>(
+      `/api/v1/runs/${params.execution_id}/${params.id}`,
       "GET",
     );
   }
 }
-
-/*
-
-queries.get()
-queries.list()
-
-steps.get()
-steps.list()
-
-errors.get()
-errors.list()
-*/
