@@ -581,3 +581,475 @@ Deno.test("EfficientStateManagement", async (t) => {
     });
   });
 });
+Deno.test("ErrorHandling", async (t) => {
+  const fns = new Fns({ dev: true, baseUrl: "none" });
+  const errorWorkflow = fns.createFunction(
+    { name: "ErrorHandling", version: 1 },
+    () => async ({ step }) => {
+      await step.run("fake-step-1", () => {});
+      await step.run("fake-step-2", () => {
+        throw new Error("error");
+      });
+    },
+  );
+  fns.registerFunctions([errorWorkflow]);
+  
+  const initial = buildInstance("ErrorHandling", null);
+  const abortSignal = new AbortController().signal;
+
+  await t.step("init error", async () => {
+    const result = await fns.onHandler({
+      ...initial,
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    }, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      mutations: [
+        {
+          id: "fake-step-1",
+          type: "run",
+          params: null,
+          status: "pending",
+        },
+      ],
+      queries: {},
+      state: {},
+      result: null,
+      error: null,
+      logs: [],
+    });
+  });
+
+  await t.step("error handling", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "fake-step-1",
+          type: "run",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "fake-step-2",
+          type: "run",
+          params: null,
+          status: "pending",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "error",
+      result: null,
+      mutations: [],
+      queries: {},
+      state: {},
+      error: {
+        message: "error",
+        name: "Error",
+        retryable: true,
+        stack: result.error!.stack,
+      },
+      logs: [],
+    });
+  });
+});
+Deno.test("logger.info()/warn()/error()/debug()", async (t) => {
+  const fns = new Fns({ dev: true, baseUrl: "none" });
+  const loggerWorkflow = fns.createFunction(
+    { name: "LoggerAndLevels", version: 1 },
+    () => async ({ step, logger }) => {
+      logger.info("info");
+      logger.warn("warn");
+      await step.sleep("wait-10s", "10s");
+      logger.error("error");
+      logger.debug("debug");
+      return "End!";
+    },
+  );
+  fns.registerFunctions([loggerWorkflow]);
+
+  const initial = buildInstance("LoggerAndLevels", null);
+  const abortSignal = new AbortController().signal;
+
+  await t.step("init logger", async () => {
+    const result = await fns.onHandler({
+      ...initial,
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    }, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      mutations: [
+        {
+          id: "wait-10s",
+          type: "sleep",
+          params: { timeout: 10000 },
+          status: "pending",
+        },
+      ],
+      queries: {},
+      state: {},
+      result: null,
+      error: null,
+      logs: [
+        {
+          level: "info",
+          message: "info",
+        },
+        {
+          level: "warn",
+          message: "warn",
+        },
+      ],
+    });
+  });
+
+  await t.step("logger levels", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "wait-10s",
+          type: "sleep",
+          params: { timeout: 10000 },
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "completed",
+      result: "End!",
+      mutations: [],
+      queries: {},
+      state: {},
+      error: null,
+      logs: [
+        {
+          level: "error",
+          message: "error",
+        },
+        {
+          level: "debug",
+          message: "debug",
+        },
+      ],
+    });
+  });
+});
+Deno.test("step.sleepUntil() - sleep until a specific time", async (t) => {
+  const fns = new Fns({ dev: true, baseUrl: "none" });
+
+
+  const untilDate = new Date(Date.now() + 5000);
+  const sleepUntilWorkflow = fns.createFunction(
+    { name: "SleepUntil", version: 1 },
+    () => async ({ step }) => {
+      await step.sleepUntil("wait-5s", untilDate);
+      return "End!";
+    },
+  );
+  fns.registerFunctions([sleepUntilWorkflow]);
+
+  const initial = buildInstance("SleepUntil", null);
+  const abortSignal = new AbortController().signal;
+  
+  await t.step("init sleepUntil", async () => {
+    const result = await fns.onHandler({
+      ...initial,
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    }, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      mutations: [
+        {
+          id: "wait-5s",
+          type: "sleep",
+          params: { until: untilDate.toISOString() },
+          status: "pending",
+        },
+      ],
+      queries: {},
+      state: {},
+      result: null,
+      error: null,
+      logs: [],
+    });
+  });
+
+  await t.step("sleepUntil", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "wait-5s",
+          type: "sleep",
+          params: { timeout: 5000 },
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "completed",
+      result: "End!",
+      mutations: [],
+      queries: {},
+      state: {},
+      error: null,
+      logs: [],
+    });
+  });
+});
+Deno.test("step.lock()/unlock() - lock and unlock a resource", async (t) => {
+  const fns = new Fns({ dev: true, baseUrl: "none" });
+
+  const lockUnlockWorkflow = fns.createFunction(
+    { name: "LockUnlock", version: 1 },
+    () => async ({ step }) => {
+      await step.lock("lock-resource", ["lucas-2131032"]);
+      await step.unlock("lock-resource");
+      return "End!";
+    },
+  );
+  fns.registerFunctions([lockUnlockWorkflow]);
+
+  const initial = buildInstance("LockUnlock", null);
+  const abortSignal = new AbortController().signal;
+  
+  await t.step("init lockUnlock", async () => {
+    const result = await fns.onHandler({
+      ...initial,
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    }, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      mutations: [
+        {
+          id: "lock-resource",
+          type: "lock",
+          params: {
+            keys: ["lucas-2131032"],
+          },
+          status: "pending",
+        },
+      ],
+      queries: {},
+      state: {},
+      result: null,
+      error: null,
+      logs: [],
+    });
+  });
+
+  await t.step("lockUnlock", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "lock-resource",
+          type: "lock",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      result: null,
+      mutations: [
+        {
+          id: "lock-resource",
+          type: "unlock",
+          params: null,
+          status: "pending",
+        },
+      ],
+      queries: {},
+      state: {},
+      error: null,
+      logs: [],
+    });
+  });
+
+  await t.step("complete", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "lock-resource",
+          type: "lock",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "lock-resource",
+          type: "unlock",
+          params: null,
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "completed",
+      result: "End!",
+      mutations: [],
+      queries: {},
+      state: {},
+      error: null,
+      logs: [],
+    });
+  });
+});
+Deno.test("step.repeat() - repeat a step until the timer expires", async (t) => {
+  const fns = new Fns({ dev: true, baseUrl: "none" });
+
+  const repeatWorkflow = fns.createFunction(
+    { name: "Repeat", version: 1 },
+    () => async ({ step, logger }) => {
+      for await (const count of step.repeat("repeat-step", { times: 3, every: "1s" })) {
+        logger.info("Count", count);
+      }
+      return "End!";
+    },
+  );
+  fns.registerFunctions([repeatWorkflow]);
+
+  const initial = buildInstance("Repeat", null);
+  const abortSignal = new AbortController().signal;
+  
+  await t.step("init repeat", async () => {
+    const result = await fns.onHandler({
+      ...initial,
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    }, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      mutations: [
+        {
+          id: "repeat-step-1",
+          type: "sleep",
+          params: {
+            timeout: 1000
+          },
+          status: "pending",
+        },
+      ],
+      queries: {},
+      state: {},
+      result: null,
+      error: null,
+      logs: [{
+        level: "info",
+        message: "Count 1",
+      }],
+    });
+  });
+  
+  await t.step("repeat 2", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "repeat-step-1",
+          type: "sleep",
+          params: {
+            timeout: 1000
+          },
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "incomplete",
+      result: null,
+      mutations: [
+        {
+          id: "repeat-step-2",
+          type: "sleep",
+          params: {
+            timeout: 1000
+          },
+          status: "pending",
+        },
+      ],
+      queries: {},
+      state: {},
+      error: null,
+      logs: [{
+        level: "info",
+        message: "Count 2",
+      }],
+    });
+  });
+  
+  await t.step("repeat 3", async () => {
+    const params: FnsRequestParams = {
+      ...initial,
+      steps: [
+        {
+          id: "repeat-step-1",
+          type: "sleep",
+          params: {
+            timeout: 1000
+          },
+          status: "completed",
+          result: null,
+        },
+        {
+          id: "repeat-step-2",
+          type: "sleep",
+          params: {
+            timeout: 1000
+          },
+          status: "completed",
+          result: null,
+        },
+      ],
+      version: 1,
+      checksum: fns.getConfig().checksum,
+    };
+    const result = await fns.onHandler(params, abortSignal);
+    assertEquals(result, {
+      status: "completed",
+      result: "End!",
+      mutations: [],
+      queries: {},
+      state: {},
+      error: null,
+      logs: [{
+        level: "info",
+        message: "Count 3",
+      }],
+    });
+  });
+});

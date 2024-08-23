@@ -343,14 +343,15 @@ export class Fns {
       id: string,
       cron: { every: string | number; times?: number },
     ): AsyncGenerator<number, void, unknown> {
-      let count = 0;
+      let count = 1;
       const times = (cron.times === undefined || isNaN(cron.times))
         ? Infinity
         : cron.times;
       while (true) {
-        yield count++;
-        if (count >= times) return;
-        await sleep(`${id}-${count}`, cron.every);
+        const curr = count++;
+        yield curr;
+        if (curr >= times) break;
+        await sleep(`${id}-${curr}`, cron.every);
       }
     }
     function useState<T = unknown>(
