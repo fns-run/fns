@@ -593,7 +593,7 @@ Deno.test("ErrorHandling", async (t) => {
     },
   );
   fns.registerFunctions([errorWorkflow]);
-  
+
   const initial = buildInstance("ErrorHandling", null);
   const abortSignal = new AbortController().signal;
 
@@ -750,7 +750,6 @@ Deno.test("logger.info()/warn()/error()/debug()", async (t) => {
 Deno.test("step.sleepUntil() - sleep until a specific time", async (t) => {
   const fns = new Fns({ dev: true, baseUrl: "none" });
 
-
   const untilDate = new Date(Date.now() + 5000);
   const sleepUntilWorkflow = fns.createFunction(
     { name: "SleepUntil", version: 1 },
@@ -763,7 +762,7 @@ Deno.test("step.sleepUntil() - sleep until a specific time", async (t) => {
 
   const initial = buildInstance("SleepUntil", null);
   const abortSignal = new AbortController().signal;
-  
+
   await t.step("init sleepUntil", async () => {
     const result = await fns.onHandler({
       ...initial,
@@ -830,7 +829,7 @@ Deno.test("step.lock()/unlock() - lock and unlock a resource", async (t) => {
 
   const initial = buildInstance("LockUnlock", null);
   const abortSignal = new AbortController().signal;
-  
+
   await t.step("init lockUnlock", async () => {
     const result = await fns.onHandler({
       ...initial,
@@ -931,7 +930,9 @@ Deno.test("step.repeat() - repeat a step until the timer expires", async (t) => 
   const repeatWorkflow = fns.createFunction(
     { name: "Repeat", version: 1 },
     () => async ({ step, logger }) => {
-      for await (const count of step.repeat("repeat-step", { times: 3, every: "1s" })) {
+      for await (
+        const count of step.repeat("repeat-step", { times: 3, every: "1s" })
+      ) {
         logger.info("Count", count);
       }
       return "End!";
@@ -941,7 +942,7 @@ Deno.test("step.repeat() - repeat a step until the timer expires", async (t) => 
 
   const initial = buildInstance("Repeat", null);
   const abortSignal = new AbortController().signal;
-  
+
   await t.step("init repeat", async () => {
     const result = await fns.onHandler({
       ...initial,
@@ -955,7 +956,7 @@ Deno.test("step.repeat() - repeat a step until the timer expires", async (t) => 
           id: "repeat-step-1",
           type: "sleep",
           params: {
-            timeout: 1000
+            timeout: 1000,
           },
           status: "pending",
         },
@@ -970,7 +971,7 @@ Deno.test("step.repeat() - repeat a step until the timer expires", async (t) => 
       }],
     });
   });
-  
+
   await t.step("repeat 2", async () => {
     const params: FnsRequestParams = {
       ...initial,
@@ -979,7 +980,7 @@ Deno.test("step.repeat() - repeat a step until the timer expires", async (t) => 
           id: "repeat-step-1",
           type: "sleep",
           params: {
-            timeout: 1000
+            timeout: 1000,
           },
           status: "completed",
           result: null,
@@ -997,7 +998,7 @@ Deno.test("step.repeat() - repeat a step until the timer expires", async (t) => 
           id: "repeat-step-2",
           type: "sleep",
           params: {
-            timeout: 1000
+            timeout: 1000,
           },
           status: "pending",
         },
@@ -1011,7 +1012,7 @@ Deno.test("step.repeat() - repeat a step until the timer expires", async (t) => 
       }],
     });
   });
-  
+
   await t.step("repeat 3", async () => {
     const params: FnsRequestParams = {
       ...initial,
@@ -1020,7 +1021,7 @@ Deno.test("step.repeat() - repeat a step until the timer expires", async (t) => 
           id: "repeat-step-1",
           type: "sleep",
           params: {
-            timeout: 1000
+            timeout: 1000,
           },
           status: "completed",
           result: null,
@@ -1029,7 +1030,7 @@ Deno.test("step.repeat() - repeat a step until the timer expires", async (t) => 
           id: "repeat-step-2",
           type: "sleep",
           params: {
-            timeout: 1000
+            timeout: 1000,
           },
           status: "completed",
           result: null,

@@ -343,6 +343,13 @@ export class Fns {
       id: string,
       cron: { every: string | number; times?: number },
     ): AsyncGenerator<number, void, unknown> {
+      assertExists(id, "id is required");
+      assertExists(cron, "cron is required");
+      assert(typeof id === "string", "id must be a string");
+      assert(
+        typeof cron === "object" && cron !== null,
+        "cron must be an object",
+      );
       let count = 1;
       const times = (cron.times === undefined || isNaN(cron.times))
         ? Infinity
