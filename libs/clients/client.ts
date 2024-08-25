@@ -1,4 +1,5 @@
-import { assert, assertExists } from "../../deps.ts";
+import { assert } from "../../deps.ts";
+import { ApiKeyRequiredError } from "../errors.ts";
 
 export type FnsConfig = {
   dev?: boolean;
@@ -27,7 +28,7 @@ export class BaseClient {
     body?: unknown,
     idempotencyKey?: string | null,
   ): Promise<T> {
-    assertExists(this.options.apiKey, "apiKey is required");
+    if (!this.options.apiKey) throw new ApiKeyRequiredError();
     assert(typeof this.options.apiKey === "string", "apiKey must be a string");
     const parsedURL = url instanceof URL
       ? url
@@ -42,7 +43,10 @@ export class BaseClient {
       },
       body: body ? JSON.stringify(body) : null,
     });
-    if (!res.ok) throw new Error(`Failed to fetch ${parsedURL.pathname}`);
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(error);
+    }
     return await res.json() as T;
   }
 }

@@ -24,11 +24,11 @@ export class ErrorsClient extends BaseClient {
   /**
    * List all errors of a run
    * @example
-   * const errors = await fns.errors.list({ id: "..." })
+   * const errors = await fns.errors.list({ execution_id: "...", run_id: "..." });
    */
   list(params: ErrorsListParams): Promise<Pagination<Error>> {
     const url = new URL(
-      `/api/v1/errors/${params.execution_id}/${params.run_id}`,
+      `/v1/errors/${params.execution_id}/${params.run_id}`,
       this.options.baseUrl,
     );
     if (params.limit) {

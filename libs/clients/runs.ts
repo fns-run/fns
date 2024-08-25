@@ -32,7 +32,7 @@ export class RunsClient extends BaseClient {
    */
   list(params: RunListParams): Promise<Pagination<Run>> {
     const url = new URL(
-      `/api/v1/runs/${params.execution_id}`,
+      `/v1/runs/${params.execution_id}`,
       this.options.baseUrl,
     );
     if (params.limit) {
@@ -51,7 +51,7 @@ export class RunsClient extends BaseClient {
    */
   retrieve(params: RunRetrieveParams): Promise<Run> {
     return this.request<Run>(
-      `/api/v1/runs/${params.execution_id}/${params.id}`,
+      `/v1/runs/${params.execution_id}/${params.id}`,
       "GET",
     );
   }

@@ -36,7 +36,7 @@ export class QueriesClient extends BaseClient {
    */
   list(params: QueryListParams): Promise<Pagination<Query>> {
     const url = new URL(
-      `/api/v1/queries/${params.execution_id}`,
+      `/v1/queries/${params.execution_id}`,
       this.options.baseUrl,
     );
     if (params.limit) {
@@ -55,7 +55,7 @@ export class QueriesClient extends BaseClient {
    */
   retrieve<T = unknown>(params: QueryRetrieveParams): Promise<QueryValue<T>> {
     return this.request<QueryValue<T>>(
-      `/api/v1/queries/${params.id}/${params.query}`,
+      `/v1/queries/${params.id}/${params.query}`,
       "GET",
     );
   }

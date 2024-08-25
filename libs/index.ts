@@ -91,11 +91,11 @@ export class Fns {
   ): Promise<FnsResponse> {
     const definition = this.definitions.get(event.name);
     if (!definition) throw new Error(`Function ${event.name} not found`);
-    if (definition.version !== event.version) {
+    /*if (definition.version !== event.version) {
       throw new Error(
         `Function ${event.name} version ${definition.version} mismatch with request version ${event.version}`,
       );
-    }
+    }*/
     const output = await this.engine(event, definition.fn, abortSignal);
     return output as FnsResponse;
   }

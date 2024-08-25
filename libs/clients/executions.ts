@@ -14,10 +14,13 @@ export type Execution = {
   created_at: string;
   updated_at: string;
 };
+export type ExecutionRetrieveParams = {
+  id: string;
+};
 export type ExecutionInvokeParams = {
   id?: string;
   name: string;
-  data: unknown;
+  data?: unknown | null;
   wait?: boolean;
   idempotencyKey?: string;
 };
@@ -59,7 +62,7 @@ export class ExecutionsClient extends BaseClient {
    * const executions = await fns.executions.list()
    */
   list(params?: ExecutionListParams): Promise<Pagination<Execution>> {
-    const url = new URL("/api/v1/executions", this.options.baseUrl);
+    const url = new URL("/v1/executions", this.options.baseUrl);
     if (params) {
       if (params.limit) {
         url.searchParams.set("limit", String(params.limit));
@@ -80,10 +83,10 @@ export class ExecutionsClient extends BaseClient {
   /**
    * Retrieve a specific execution by its ID.
    * @example
-   * const execution = await fns.executions.retrieve("id")
+   * const execution = await fns.executions.retrieve({ id: "..." })
    */
-  retrieve(id: string): Promise<Execution> {
-    return this.request<Execution>(`/api/v1/executions/${id}`, "GET");
+  retrieve(params: ExecutionRetrieveParams): Promise<Execution> {
+    return this.request<Execution>(`/v1/executions/${params.id}`, "GET");
   }
 
   /**
@@ -99,7 +102,7 @@ export class ExecutionsClient extends BaseClient {
     params: ExecutionInvokeParams,
   ): Promise<T | Execution> {
     const execution = await this.request<Execution>(
-      "/api/v1/executions",
+      "/v1/executions",
       "POST",
       params,
     );
@@ -116,7 +119,7 @@ export class ExecutionsClient extends BaseClient {
    */
   trigger(params: ExecutionTriggerParams): Promise<void> {
     return this.request<void>(
-      `/api/v1/executions/${params.id}/trigger`,
+      `/v1/executions/${params.id}/trigger`,
       "POST",
       params.data ?? null,
       params.idempotencyKey,
@@ -130,7 +133,7 @@ export class ExecutionsClient extends BaseClient {
    */
   abort(params: ExecutionAbortParams): Promise<Execution> {
     return this.request<Execution>(
-      `/api/v1/executions/${params.id}/abort`,
+      `/v1/executions/${params.id}/abort`,
       "POST",
     );
   }
@@ -138,11 +141,11 @@ export class ExecutionsClient extends BaseClient {
   /**
    * Pause an execution.
    * @example
-   * const execution = await fns.executions.pause("id")
+   * const execution = await fns.executions.pause({ id: "..." })
    */
   pause(params: ExecutionPauseParams): Promise<Execution> {
     return this.request<Execution>(
-      `/api/v1/executions/${params.id}/pause`,
+      `/v1/executions/${params.id}/pause`,
       "POST",
       null,
       params.idempotencyKey,
@@ -152,11 +155,11 @@ export class ExecutionsClient extends BaseClient {
   /**
    * Resume an execution.
    * @example
-   * const execution = await fns.executions.resume("id")
+   * const execution = await fns.executions.resume({ id: "..." })
    */
   resume(params: ExecutionResumeParams): Promise<Execution> {
     return this.request<Execution>(
-      `/api/v1/executions/${params.id}/resume`,
+      `/v1/executions/${params.id}/resume`,
       "POST",
       null,
       params.idempotencyKey,
@@ -166,10 +169,10 @@ export class ExecutionsClient extends BaseClient {
   /**
    * Get or wait for the result of an execution.
    * @example
-   * const result = await fns.executions.result("id")
+   * const result = await fns.executions.result({ id: "..." })
    */
   result<T = unknown>(params: ExecutionResultParams): Promise<T> {
-    return this.request<T>(`/api/v1/executions/${params.id}/result`, "GET");
+    return this.request<T>(`/v1/executions/${params.id}/result`, "GET");
   }
 
   /**
@@ -178,6 +181,6 @@ export class ExecutionsClient extends BaseClient {
    * const data = await fns.executions.data({ id: "..." })
    */
   data<T = unknown>(params: ExecutionDataParams): Promise<T> {
-    return this.request<T>(`/api/v1/executions/${params.id}/data`, "GET");
+    return this.request<T>(`/v1/executions/${params.id}/data`, "GET");
   }
 }

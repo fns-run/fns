@@ -37,7 +37,7 @@ export class StepsClient extends BaseClient {
    */
   list(params: StepListParams): Promise<Pagination<Step>> {
     const url = new URL(
-      `/api/v1/steps/${params.execution_id}`,
+      `/v1/steps/${params.execution_id}`,
       this.options.baseUrl,
     );
     if (params.limit) {
@@ -56,7 +56,7 @@ export class StepsClient extends BaseClient {
    */
   retrieve(params: StepRetrieveParams): Promise<Step> {
     return this.request<Step>(
-      `/api/v1/steps/${params.execution_id}/${params.id}`,
+      `/v1/steps/${params.execution_id}/${params.id}`,
       "GET",
     );
   }

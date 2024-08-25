@@ -26,6 +26,13 @@ export class SigningKeyRequiredError extends NonRetriableError {
     this.name = "SigningKeyRequiredError";
   }
 }
+export class ApiKeyRequiredError extends Error {
+  constructor(message?: string) {
+    super(message);
+    Object.setPrototypeOf(this, ApiKeyRequiredError.prototype);
+    this.name = "ApiKeyRequiredError";
+  }
+}
 export class FunctionNotFoundError extends NonRetriableError {
   constructor(message?: string) {
     super(message);
