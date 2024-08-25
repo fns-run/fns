@@ -1,7 +1,12 @@
+export interface FnsOptions {
+  dev?: boolean;
+  endpoint?: string;
+  signingKey?: string;
+  apiKey?: string;
+}
 export interface Query {
   name: string;
   cb: () => unknown;
-  dependencies: string[];
 }
 export type Callback<T = unknown> = () => T;
 export interface StateGetter<T = unknown> extends Callback<T> {
@@ -12,41 +17,24 @@ export interface FnsQueryValue<T> {
   timestamp: string;
   version: number;
 }
-export type FnsRemoteFunction = {
-  get<T = unknown>(id: string, options: { id: string }): Promise<T>;
-  invoke<T = unknown>(
-    id: string,
-    options: { id?: string; data?: unknown },
-  ): Promise<T>;
-  trigger(
-    id: string,
-    options: { id: string; signal: string; data?: unknown },
-  ): Promise<void>;
-  query<T = unknown>(
-    id: string,
-    options: { id: string; query: string },
-  ): Promise<FnsQueryValue<T>>;
-  result<T = unknown>(id: string): Promise<T>;
-};
 export type FnsFunctionParams = {
-  useSignal<T = unknown>(name: string, cb: (data: T) => void): void; // TODO: () => T | undefined;
+  useSignal<T = unknown>(name: string, cb: (data: T) => void): void;
   useQuery<T = unknown>(
     name: string,
     cb: () => T,
     dependencies?: StateGetter[],
-  ): void; // trouver un moyen de detecter les dépendances avec microtasks et potentiellement ne pas demander de dépendances
+  ): void;
   useState<T = unknown>(
     id: string,
-    initial?: T,
+    initial: T,
   ): [
-    () => typeof initial,
+    () => T,
     (
       newState:
-        | typeof initial
-        | ((prevState: typeof initial) => typeof initial),
+        | T
+        | ((prevState: T) => T),
     ) => void,
   ];
-  useFunctions(functions: string[]): Record<string, FnsRemoteFunction>;
 };
 export interface Logger {
   info(...args: unknown[]): void;
@@ -54,6 +42,10 @@ export interface Logger {
   error(...args: unknown[]): void;
   debug(...args: unknown[]): void;
 }
+export type FnsLog = {
+  level: "info" | "warn" | "error" | "debug";
+  message: string;
+};
 export type FnsFunction = (params: FnsFunctionParams) => (execution: {
   ctx: {
     id: string;
@@ -61,10 +53,8 @@ export type FnsFunction = (params: FnsFunctionParams) => (execution: {
     data: unknown;
   };
   step: {
-    // enlever les options et mettre juste fn
-    // mettre en place une vérification des ids uniques et slugify correct
-    checkpoint(): Promise<boolean>;
-    run<T = unknown>(id: string, step: () => T | Promise<T>): Promise<T>; // potentiellement mettre des paramètres
+    checkpoint(): void;
+    run<T = unknown>(id: string, step: () => T | Promise<T>): Promise<T>;
     condition(
       id: string,
       cb: () => boolean,
@@ -72,7 +62,10 @@ export type FnsFunction = (params: FnsFunctionParams) => (execution: {
     ): Promise<boolean>;
     sleep(id: string, timeout: string | number): Promise<void>;
     sleepUntil(id: string, until: Date | string): Promise<void>;
-    // ne pas mettre de timeout? si timeout alors ça doit être le scheduler de lock qui gère
+    repeat(
+      id: string,
+      cron: { every: string | number; times?: number },
+    ): AsyncGenerator<number, void, unknown>;
     lock(
       id: string,
       keys: string[],
@@ -89,6 +82,9 @@ export type FnsRequestParams = {
   run_id: string;
   name: string;
   data: unknown;
+  /* system */
+  version: number;
+  checksum: number;
   snapshot: boolean;
   steps: Step[];
   state: Record<string, unknown>;
@@ -106,52 +102,44 @@ export type StepType =
   | "condition"
   | "signal"
   | "lock"
-  | "unlock"
-  | "invoke"
-  | "trigger"
-  | "query"
-  | "get";
+  | "unlock";
 export type Step = {
   id: string;
   type: StepType;
   params: Params;
-  completed: boolean;
+  status: "pending" | "completed";
   result: unknown;
 };
 export type MutationInitization = {
+  status: "pending";
   type: StepType;
   params: Params;
 };
 export type MutationCompleted = {
-  completed: true;
+  status: "completed";
   result: unknown;
   elapsed: number;
 };
 export type Mutation =
-  & { id: string; completed: boolean }
+  & {
+    id: string;
+  }
   & (MutationInitization | MutationCompleted);
 
-export type FnsCompletedResponse = {
-  completed: true;
-  result: unknown;
-};
-export type FnsIncompleteResponse = {
-  completed: false;
+export type FnsResponse = {
+  status: "completed" | "incomplete" | "error";
   mutations: Mutation[];
-  state?: Record<string, unknown>;
-};
-export type FnsErrorResponse = {
-  completed: false;
+  queries: Record<string, unknown>;
+  state: Record<string, unknown>;
   error: {
     message: string;
     stack: string;
     name: string;
     retryable: boolean;
-  };
+  } | null;
+  result: unknown;
+  logs: FnsLog[];
 };
-export type FnsResponse =
-  & { completed: boolean; queries?: Record<string, unknown> }
-  & (FnsCompletedResponse | FnsIncompleteResponse | FnsErrorResponse);
 
 export type Schema = {
   data?: unknown; // to define, replace unknown with JSON schema

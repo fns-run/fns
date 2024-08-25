@@ -140,3 +140,4 @@ deno.lock
 html_cov/
 cov.lcov
 deno.lock
+simulation*.ts

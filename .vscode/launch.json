@@ -6,6 +6,23 @@
   "configurations": [
     {
       "request": "launch",
+      "name": "Launch Example",
+      "type": "node",
+      "program": "${workspaceFolder}/main.ts",
+      "cwd": "${workspaceFolder}",
+      "env": {},
+      "runtimeExecutable": "/Users/lucas/.deno/bin/deno",
+      "runtimeArgs": [
+        "run",
+        "--allow-all",
+        "--unstable-ffi",
+        "--inspect-brk",
+        "${workspaceFolder}/examples/helloworld.ts"
+      ],
+      "attachSimplePort": 9229
+    },
+    {
+      "request": "launch",
       "name": "Launch Program",
       "type": "node",
       "program": "${workspaceFolder}/main.ts",
