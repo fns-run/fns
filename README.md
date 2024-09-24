@@ -64,11 +64,6 @@ stateful applications 🚀.
 - **Platform Agnostic**: Works with any framework and platform, allowing you to
   build with the tools you love.
 
-## 📦 Features
-
-- **Queries**: Queries on your durable instance.
-- **State Management**: Manage state across distributed functions with ease.
-
 ## 🚀 Quick Start
 
 **NPM**
